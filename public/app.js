@@ -141,6 +141,7 @@
   var intervalOptions = document.getElementById("interval-options");
   var generateButton = document.getElementById("generate-button");
   var statusBox = document.getElementById("status-box");
+  var loadingPanel = document.getElementById("loading-panel");
   var resultsPanel = document.getElementById("results-panel");
   var modeChip = document.getElementById("mode-chip");
   var memoTitle = document.getElementById("memo-title");
@@ -157,6 +158,10 @@
     state.loading = isLoading;
     generateButton.disabled = isLoading;
     generateButton.textContent = isLoading ? "Running..." : "Run Workflow";
+    loadingPanel.hidden = !isLoading;
+    if (isLoading) {
+      resultsPanel.hidden = true;
+    }
   }
 
   function setActiveButton(container, attributeName, value) {
@@ -168,16 +173,20 @@
 
   function renderCompanyOptions() {
     companyOptions.innerHTML = "";
-    Object.keys(companyData).forEach(function (companyKey) {
-      var button = document.createElement("button");
-      button.className = "pill";
-      button.setAttribute("data-company", companyKey);
-      button.textContent = companyData[companyKey].name;
-      if (companyKey === state.companyKey) {
-        button.classList.add("active");
-      }
-      companyOptions.appendChild(button);
-    });
+    Object.keys(companyData)
+      .sort(function (left, right) {
+        return companyData[left].name.localeCompare(companyData[right].name);
+      })
+      .forEach(function (companyKey) {
+        var button = document.createElement("button");
+        button.className = "pill";
+        button.setAttribute("data-company", companyKey);
+        button.textContent = companyData[companyKey].name;
+        if (companyKey === state.companyKey) {
+          button.classList.add("active");
+        }
+        companyOptions.appendChild(button);
+      });
   }
 
   function formatDate(dateString) {
@@ -403,16 +412,170 @@
     return normalized;
   }
 
-  function renderMemo(memo) {
-    memoBody.innerHTML = "";
-    memo
-      .split(/\n{2,}/)
-      .filter(Boolean)
-      .forEach(function (paragraph) {
-        var p = document.createElement("p");
-        p.textContent = paragraph.trim();
-        memoBody.appendChild(p);
+  function appendLinkedText(parent, text) {
+    var linkPattern = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
+    var lastIndex = 0;
+    var match;
+
+    while ((match = linkPattern.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parent.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+      }
+
+      var link = document.createElement("a");
+      link.href = match[2];
+      link.target = "_blank";
+      link.rel = "noreferrer";
+      link.textContent = match[1];
+      parent.appendChild(link);
+      lastIndex = linkPattern.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+      parent.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
+  }
+
+  function parseMemoSections(memo) {
+    var lines = memo.split(/\r?\n/);
+    var sections = [];
+    var current = null;
+
+    lines.forEach(function (line) {
+      var trimmed = line.trim();
+      var heading = trimmed.match(/^\d+\.\s+(.+)$/);
+
+      if (heading) {
+        if (current) sections.push(current);
+        current = {
+          title: heading[1].trim(),
+          lines: []
+        };
+        return;
+      }
+
+      if (!current) {
+        current = {
+          title: "Memo",
+          lines: []
+        };
+      }
+      current.lines.push(line);
+    });
+
+    if (current) sections.push(current);
+    return sections
+      .map(function (section) {
+        return {
+          title: section.title,
+          body: section.lines.join("\n").trim()
+        };
+      })
+      .filter(function (section) {
+        return section.body;
       });
+  }
+
+  function sectionSources(title, sources) {
+    var lowerTitle = title.toLowerCase();
+    var filtered = sources || [];
+
+    if (lowerTitle.indexOf("past") !== -1) {
+      return [];
+    }
+
+    if (lowerTitle.indexOf("why") !== -1 || lowerTitle.indexOf("csis") !== -1) {
+      filtered = filtered.filter(function (source) {
+        return (
+          source.sourceClass === "thinktank" ||
+          source.domain === "csis.org" ||
+          String(source.domain || "").indexOf("csis.org") !== -1
+        );
+      });
+    } else if (lowerTitle.indexOf("recent") !== -1) {
+      filtered = filtered.filter(function (source) {
+        return source.sourceClass !== "thinktank";
+      });
+    }
+
+    if (!filtered.length) {
+      filtered = sources || [];
+    }
+
+    return filtered
+      .filter(function (source) {
+        return source.url;
+      })
+      .slice(0, 4);
+  }
+
+  function appendCitations(parent, citations) {
+    if (!citations.length) return;
+
+    var citationWrap = document.createElement("span");
+    citationWrap.className = "memo-citations";
+    citationWrap.appendChild(document.createTextNode(" "));
+
+    citations.forEach(function (source, index) {
+      var link = document.createElement("a");
+      link.href = source.url;
+      link.target = "_blank";
+      link.rel = "noreferrer";
+      link.textContent = "[" + (index + 1) + "]";
+      link.title = source.title || source.domain || "Source";
+      citationWrap.appendChild(link);
+    });
+
+    parent.appendChild(citationWrap);
+  }
+
+  function renderMemo(memo, sources) {
+    memoBody.innerHTML = "";
+
+    parseMemoSections(memo).forEach(function (section) {
+      var sectionEl = document.createElement("section");
+      sectionEl.className = "memo-section";
+
+      var title = document.createElement("h3");
+      title.textContent = section.title;
+      sectionEl.appendChild(title);
+
+      section.body
+        .split(/\n{2,}/)
+        .filter(Boolean)
+        .forEach(function (paragraph, paragraphIndex) {
+          var trimmed = paragraph.trim();
+
+          if (trimmed.indexOf("- ") === 0) {
+            var list = document.createElement("ul");
+            trimmed.split(/\n+/).forEach(function (line) {
+              var itemText = line.replace(/^-\s*/, "").trim();
+              if (!itemText) return;
+              var item = document.createElement("li");
+              appendLinkedText(item, itemText);
+              if (paragraphIndex === 0) {
+                appendCitations(item, sectionSources(section.title, sources));
+              }
+              list.appendChild(item);
+            });
+            sectionEl.appendChild(list);
+            return;
+          }
+
+          var p = document.createElement("p");
+          appendLinkedText(p, trimmed);
+          if (paragraphIndex === 0) {
+            appendCitations(p, sectionSources(section.title, sources));
+          }
+          sectionEl.appendChild(p);
+        });
+
+      memoBody.appendChild(sectionEl);
+    });
+  }
+
+  function readableSourceClass(sourceClass) {
+    return String(sourceClass || "source").replace(/_/g, " ");
   }
 
   function renderSources(sources) {
@@ -448,13 +611,8 @@
 
       var sourceTag = document.createElement("span");
       sourceTag.className = "tag source";
-      sourceTag.textContent = source.sourceClass || "source";
+      sourceTag.textContent = readableSourceClass(source.sourceClass);
       tagRow.appendChild(sourceTag);
-
-      var acceptedTag = document.createElement("span");
-      acceptedTag.className = "tag accepted";
-      acceptedTag.textContent = source.validationStatus || "accepted";
-      tagRow.appendChild(acceptedTag);
 
       top.appendChild(title);
       top.appendChild(tagRow);
@@ -488,7 +646,7 @@
     fileChip.textContent = result.excelFileName
       ? "Validated file: " + result.excelFileName
       : "Validated sources displayed below";
-    renderMemo(result.memo);
+    renderMemo(result.memo, result.sources || []);
     renderSources(result.sources || []);
   }
 

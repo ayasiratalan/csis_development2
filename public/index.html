@@ -30,7 +30,7 @@
 
           <div class="selector-block">
             <span class="selector-label">Company</span>
-            <div class="pill-row" id="company-options">
+            <div class="pill-row company-scroll" id="company-options">
             </div>
           </div>
 
@@ -49,6 +49,18 @@
 
           <div class="status-box" id="status-box">
             Ready to generate a memo.
+          </div>
+        </section>
+
+        <section class="loading-panel" id="loading-panel" hidden>
+          <div class="loader-ring"></div>
+          <div>
+            <div class="eyebrow">Workflow Running</div>
+            <h2>Building the memo</h2>
+            <p>
+              n8n is collecting sources, validating documents, writing the memo,
+              and preparing the final source list.
+            </p>
           </div>
         </section>
 
