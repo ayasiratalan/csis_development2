@@ -58,72 +58,33 @@ workflow.nodes.unshift({
 
 workflow.nodes.push({
   parameters: {
-    mode: "manual",
-    duplicateItem: false,
-    assign: "assignBelow",
-    includeOtherFields: false,
-    fields: {
-      values: [
-        {
-          name: "ok",
-          type: "booleanValue",
-          booleanValue: true
-        },
-        {
-          name: "run_id",
-          stringValue: "={{ $('Normalize Inputs').item.json.run_id || '' }}"
-        },
-        {
-          name: "generated_at",
-          stringValue: "={{ $now }}"
-        },
-        {
-          name: "company_name",
-          stringValue: "={{ $('Normalize Inputs').item.json.company_name || '' }}"
-        },
-        {
-          name: "time_period_days",
-          stringValue: "={{ $('Normalize Inputs').item.json.time_period_days || '' }}"
-        },
-        {
-          name: "time_period_label",
-          stringValue: "={{ $('Normalize Inputs').item.json.time_period_label || '' }}"
-        },
-        {
-          name: "final_one_pager",
-          stringValue: "={{ $json.final_one_pager || '' }}"
-        },
-        {
-          name: "recent_developments_paragraph",
-          stringValue: "={{ $json.recent_developments_paragraph || '' }}"
-        },
-        {
-          name: "past_csis_engagement_paragraph",
-          stringValue: "={{ $json.past_csis_engagement_paragraph || '' }}"
-        },
-        {
-          name: "csis_convergence_paragraph",
-          stringValue: "={{ $json.csis_convergence_paragraph || '' }}"
-        },
-        {
-          name: "email_pitch_ideas",
-          stringValue: "={{ $json.email_pitch_ideas || '' }}"
-        },
-        {
-          name: "excel_file_name",
-          stringValue: "={{ ($('Normalize Inputs').item.json.company_name || 'Company') + '_validated_documents_' + $now.toFormat('yyyy-MM-dd') + '.xlsx' }}"
-        },
-        {
-          name: "validated_sources",
-          type: "arrayValue",
-          arrayValue: "={{ $('Aggregate Documents for LLM').item.json.validated_sources || [] }}"
-        }
-      ]
-    },
-    options: {}
+    jsCode: [
+      "const final = $input.first().json || {};",
+      "const normalized = $('Normalize Inputs').first().json || {};",
+      "const aggregate = $('Aggregate Documents for LLM').first().json || {};",
+      "const sources = Array.isArray(aggregate.validated_sources) ? aggregate.validated_sources : [];",
+      "",
+      "return [{",
+      "  json: {",
+      "    ok: true,",
+      "    run_id: normalized.run_id || '',",
+      "    generated_at: new Date().toISOString(),",
+      "    company_name: normalized.company_name || '',",
+      "    time_period_days: normalized.time_period_days || '',",
+      "    time_period_label: normalized.time_period_label || '',",
+      "    final_one_pager: final.final_one_pager || '',",
+      "    recent_developments_paragraph: final.recent_developments_paragraph || '',",
+      "    past_csis_engagement_paragraph: final.past_csis_engagement_paragraph || '',",
+      "    csis_convergence_paragraph: final.csis_convergence_paragraph || '',",
+      "    email_pitch_ideas: final.email_pitch_ideas || '',",
+      "    excel_file_name: `${normalized.company_name || 'Company'}_validated_documents_${new Date().toISOString().slice(0, 10)}.xlsx`,",
+      "    validated_sources: sources",
+      "  }",
+      "}];"
+    ].join("\n")
   },
-  type: "n8n-nodes-base.set",
-  typeVersion: 3.4,
+  type: "n8n-nodes-base.code",
+  typeVersion: 2,
   position: [3136, 960],
   id: "prepare-webhook-response",
   name: "Prepare Webhook Response"

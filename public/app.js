@@ -159,6 +159,10 @@
   }
 
   function normalizeWebhookPayload(payload) {
+    if (Array.isArray(payload)) {
+      payload = payload[0] || {};
+    }
+
     var sources = Array.isArray(payload.validated_sources)
       ? payload.validated_sources
       : Array.isArray(payload.sources)
@@ -204,7 +208,7 @@
               ? source.entityConfidence
               : typeof source.entity_confidence === "number"
                 ? source.entity_confidence
-                : null
+        : null
         };
       }),
       excelFileName: payload.excelFileName || payload.excel_file_name || ""
@@ -243,7 +247,17 @@
       );
     }
 
-    return normalizeWebhookPayload(payload);
+    var normalized = normalizeWebhookPayload(payload);
+    if (
+      (!normalized.memo || normalized.memo === "n8n returned no memo text.") &&
+      normalized.sources.length === 0
+    ) {
+      throw new Error(
+        "n8n returned an empty response. Fix the final `Prepare Webhook Response` / `Respond to Dashboard` nodes so they return `final_one_pager` and `validated_sources`."
+      );
+    }
+
+    return normalized;
   }
 
   function renderMemo(memo) {
