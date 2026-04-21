@@ -1,0 +1,1606 @@
+{
+  "name": "Summary_Agent_v11_OnePager_CSIS_Outreach",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -960,
+        768
+      ],
+      "id": "755e9f2a-b9c8-488a-ac39-982b26075863",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1tmfRQViTQHB4aheAK0DT3RSSgrR0NCrBOPfdI4XUDEA",
+          "mode": "list",
+          "cachedResultName": "data_base_v1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tmfRQViTQHB4aheAK0DT3RSSgrR0NCrBOPfdI4XUDEA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tmfRQViTQHB4aheAK0DT3RSSgrR0NCrBOPfdI4XUDEA/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "status",
+              "lookupValue": "pending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -736,
+        768
+      ],
+      "id": "2a283561-a782-4212-be9c-8c8a9484dab5",
+      "name": "Get pending requests",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ioJPOsOy0yEEoWVv",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -512,
+        768
+      ],
+      "id": "187244b5-dd09-4302-8081-d7f725c7340f",
+      "name": "Loop Over Requests"
+    },
+    {
+      "parameters": {
+        "functionCode": "const item = items[0].json;\nconst company = (item.company_name || '').toString().trim();\nif (!company) {\n  throw new Error('company_name is required in the intake sheet.');\n}\nconst days = Number(item.time_period_days || item.time_period || item.days || 14);\nconst allowed = [14, 30, 60];\nconst normalizedDays = allowed.includes(days) ? days : 14;\nconst now = new Date();\nconst end = now.toISOString().slice(0, 10);\nconst startDateObj = new Date(now);\nstartDateObj.setUTCDate(startDateObj.getUTCDate() - normalizedDays);\nconst start = startDateObj.toISOString().slice(0, 10);\nconst slug = company\n  .toLowerCase()\n  .replace(/[^a-z0-9]+/g, '_')\n  .replace(/^_+|_+$/g, '')\n  .slice(0, 60) || 'company';\nconst runId = `${slug}_${end}_${normalizedDays}d_${item.row_number || 0}`;\nconst secCik = (item.sec_cik || '').toString().replace(/\\D/g, '');\nconst paddedCik = secCik ? secCik.padStart(10, '0') : '';\nconst shortCik = secCik ? secCik.replace(/^0+/, '') : '';\nconst rawDomain = (item.company_domain || item.official_domain || '').toString().trim().toLowerCase();\nconst companyDomain = rawDomain\n  .replace(/^https?:\\/\\//, '')\n  .replace(/^www\\./, '')\n  .replace(/\\/.*$/, '');\nconst officialDomains = ['sec.gov', 'businesswire.com', 'prnewswire.com', 'globenewswire.com'];\nif (companyDomain) {\n  officialDomains.unshift(companyDomain);\n  officialDomains.unshift(`investor.${companyDomain}`);\n  officialDomains.unshift(`ir.${companyDomain}`);\n  officialDomains.unshift(`investors.${companyDomain}`);\n}\nconst dedup = (arr) => [...new Set(arr.filter(Boolean))];\nconst officialDomainsFinal = dedup(officialDomains);\nconst governmentDomains = ['lda.senate.gov', 'opensecrets.org', 'usaspending.gov', 'sam.gov', 'federalregister.gov'];\nconst thinktankDomains = ['csis.org', 'brookings.edu', 'rand.org', 'cfr.org', 'cnas.org', 'carnegieendowment.org', 'aei.org'];\nconst officialQuery = paddedCik\n  ? `\"${company}\" ${shortCik} (\"8-K\" OR \"10-Q\" OR \"10-K\" OR \"earnings release\" OR \"investor relations\" OR \"press release\")`\n  : `\"${company}\" (\"8-K\" OR \"10-Q\" OR \"10-K\" OR \"earnings release\" OR \"investor relations\" OR \"press release\")`;\nconst governmentQuery = `\"${company}\" (\"LD-2\" OR lobbying OR procurement OR \"Senate lobbying\" OR \"Federal Register\")`;\nconst thinktankQuery = `\"${company}\" (regulation OR policy OR analysis OR briefing OR strategic risk)`;\nconst newsQuery = `\"${company}\" (earnings OR acquisition OR divestiture OR lawsuit OR regulation OR contract)`;\nreturn [{\n  json: {\n    ...item,\n    company_name: company,\n    sec_cik: paddedCik,\n    sec_cik_short: shortCik,\n    company_domain: companyDomain,\n    time_period_days: normalizedDays,\n    time_period_label: item.time_period_label || `${normalizedDays} days`,\n    start_date: start,\n    end_date: end,\n    safe_file_name: slug,\n    run_id: runId,\n    official_domains: officialDomainsFinal,\n    government_domains: governmentDomains,\n    thinktank_domains: thinktankDomains,\n    official_query: officialQuery,\n    government_query: governmentQuery,\n    thinktank_query: thinktankQuery,\n    news_query: newsQuery,\n    scraped_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        768
+      ],
+      "id": "05b1ff3e-95a7-41c1-8953-4f2b4aa484ed",
+      "name": "Normalize Inputs"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  query: $('Normalize Inputs').item.json.official_query,\n  topic: 'general',\n  search_depth: 'advanced',\n  include_domains: $('Normalize Inputs').item.json.official_domains,\n  include_raw_content: true,\n  max_results: 10,\n  start_date: $('Normalize Inputs').item.json.start_date,\n  end_date: $('Normalize Inputs').item.json.end_date,\n  include_answer: false\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -32,
+        368
+      ],
+      "id": "dfa58244-94ed-46e7-8b8b-8c19e9fd3707",
+      "name": "Search Official / Regulatory Sources",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wasPaWy7tmUk5k0C",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  query: $('Normalize Inputs').item.json.government_query,\n  topic: 'general',\n  search_depth: 'advanced',\n  include_domains: $('Normalize Inputs').item.json.government_domains,\n  include_raw_content: true,\n  max_results: 8,\n  start_date: $('Normalize Inputs').item.json.start_date,\n  end_date: $('Normalize Inputs').item.json.end_date,\n  include_answer: false\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -32,
+        608
+      ],
+      "id": "119222ef-e6a6-4e9a-b33b-be1a987eeee7",
+      "name": "Search Government / Lobbying Sources",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wasPaWy7tmUk5k0C",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  query: $('Normalize Inputs').item.json.thinktank_query,\n  topic: 'general',\n  search_depth: 'advanced',\n  include_domains: $('Normalize Inputs').item.json.thinktank_domains,\n  include_raw_content: true,\n  max_results: 8,\n  start_date: $('Normalize Inputs').item.json.start_date,\n  end_date: $('Normalize Inputs').item.json.end_date,\n  include_answer: false\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -32,
+        848
+      ],
+      "id": "9c9fedb7-48a4-479e-b706-8e8ca43b4aab",
+      "name": "Search Think Tank / Policy Sources",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wasPaWy7tmUk5k0C",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  query: $('Normalize Inputs').item.json.news_query,\n  topic: 'news',\n  search_depth: 'advanced',\n  max_results: 10,\n  start_date: $('Normalize Inputs').item.json.start_date,\n  end_date: $('Normalize Inputs').item.json.end_date,\n  include_raw_content: true,\n  include_answer: false\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -32,
+        1088
+      ],
+      "id": "151e6bb4-4421-4a44-b207-aeaf191f38db",
+      "name": "Search News Sources",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wasPaWy7tmUk5k0C",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        208,
+        368
+      ],
+      "id": "3fd3bb82-6566-4e4d-8b8a-31479963a25f",
+      "name": "Merge Official Meta + Results"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        208,
+        608
+      ],
+      "id": "3a734e18-72ca-4945-800c-7bdfbfc6fcb6",
+      "name": "Merge Government Meta + Results"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        208,
+        848
+      ],
+      "id": "61f8536d-00dd-446a-9be5-417702aa322d",
+      "name": "Merge Think Tank Meta + Results"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        208,
+        1088
+      ],
+      "id": "7d8daa17-4726-4639-bb7e-2c2d4ee924d8",
+      "name": "Merge News Meta + Results"
+    },
+    {
+      "parameters": {
+        "functionCode": "\nconst sourceClass = 'official';\nconst queryField = 'official_query';\nconst item = items[0].json;\nconst results = Array.isArray(item.results) ? item.results : [];\nconst extractDomain = (url = '') => {\n  try { return new URL(url).hostname.replace(/^www\\./, ''); } catch (e) { return ''; }\n};\nconst docs = results.map((doc, idx) => {\n  const body = (doc.raw_content || doc.content || '').toString();\n  return {\n    json: {\n      run_id: item.run_id,\n      row_number: item.row_number,\n      company_name: item.company_name,\n      sec_cik: item.sec_cik || '',\n      company_domain: item.company_domain || '',\n      time_period_days: item.time_period_days,\n      time_period_label: item.time_period_label,\n      start_date: item.start_date,\n      end_date: item.end_date,\n      source_class: sourceClass,\n      source_domain: extractDomain(doc.url || ''),\n      title: (doc.title || '').toString().slice(0, 500),\n      url: doc.url || '',\n      published_date: doc.published_date || doc.published || '',\n      scraped_at: item.scraped_at,\n      query_used: item[queryField],\n      snippet: (doc.content || '').toString().slice(0, 2000),\n      content_excerpt: body.slice(0, 10000),\n      content_length: body.length,\n      source_rank: idx + 1,\n      duplicate_flag: false,\n      placeholder: false\n    }\n  };\n});\nif (docs.length === 0) {\n  return [{\n    json: {\n      run_id: item.run_id,\n      row_number: item.row_number,\n      company_name: item.company_name,\n      sec_cik: item.sec_cik || '',\n      company_domain: item.company_domain || '',\n      time_period_days: item.time_period_days,\n      time_period_label: item.time_period_label,\n      start_date: item.start_date,\n      end_date: item.end_date,\n      source_class: sourceClass,\n      source_domain: '',\n      title: '',\n      url: '',\n      published_date: '',\n      scraped_at: item.scraped_at,\n      query_used: item[queryField],\n      snippet: '',\n      content_excerpt: '',\n      content_length: 0,\n      source_rank: 0,\n      duplicate_flag: false,\n      placeholder: true\n    }\n  }];\n}\nreturn docs;\n"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        448,
+        368
+      ],
+      "id": "565362b4-106a-4f5d-bc02-96361638188b",
+      "name": "Flatten Official Results"
+    },
+    {
+      "parameters": {
+        "functionCode": "\nconst sourceClass = 'government';\nconst queryField = 'government_query';\nconst item = items[0].json;\nconst results = Array.isArray(item.results) ? item.results : [];\nconst extractDomain = (url = '') => {\n  try { return new URL(url).hostname.replace(/^www\\./, ''); } catch (e) { return ''; }\n};\nconst docs = results.map((doc, idx) => {\n  const body = (doc.raw_content || doc.content || '').toString();\n  return {\n    json: {\n      run_id: item.run_id,\n      row_number: item.row_number,\n      company_name: item.company_name,\n      sec_cik: item.sec_cik || '',\n      company_domain: item.company_domain || '',\n      time_period_days: item.time_period_days,\n      time_period_label: item.time_period_label,\n      start_date: item.start_date,\n      end_date: item.end_date,\n      source_class: sourceClass,\n      source_domain: extractDomain(doc.url || ''),\n      title: (doc.title || '').toString().slice(0, 500),\n      url: doc.url || '',\n      published_date: doc.published_date || doc.published || '',\n      scraped_at: item.scraped_at,\n      query_used: item[queryField],\n      snippet: (doc.content || '').toString().slice(0, 2000),\n      content_excerpt: body.slice(0, 10000),\n      content_length: body.length,\n      source_rank: idx + 1,\n      duplicate_flag: false,\n      placeholder: false\n    }\n  };\n});\nif (docs.length === 0) {\n  return [{\n    json: {\n      run_id: item.run_id,\n      row_number: item.row_number,\n      company_name: item.company_name,\n      sec_cik: item.sec_cik || '',\n      company_domain: item.company_domain || '',\n      time_period_days: item.time_period_days,\n      time_period_label: item.time_period_label,\n      start_date: item.start_date,\n      end_date: item.end_date,\n      source_class: sourceClass,\n      source_domain: '',\n      title: '',\n      url: '',\n      published_date: '',\n      scraped_at: item.scraped_at,\n      query_used: item[queryField],\n      snippet: '',\n      content_excerpt: '',\n      content_length: 0,\n      source_rank: 0,\n      duplicate_flag: false,\n      placeholder: true\n    }\n  }];\n}\nreturn docs;\n"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        448,
+        608
+      ],
+      "id": "e8482804-5942-4ef4-9a42-0c39b00223da",
+      "name": "Flatten Government Results"
+    },
+    {
+      "parameters": {
+        "functionCode": "\nconst sourceClass = 'thinktank';\nconst queryField = 'thinktank_query';\nconst item = items[0].json;\nconst results = Array.isArray(item.results) ? item.results : [];\nconst extractDomain = (url = '') => {\n  try { return new URL(url).hostname.replace(/^www\\./, ''); } catch (e) { return ''; }\n};\nconst docs = results.map((doc, idx) => {\n  const body = (doc.raw_content || doc.content || '').toString();\n  return {\n    json: {\n      run_id: item.run_id,\n      row_number: item.row_number,\n      company_name: item.company_name,\n      sec_cik: item.sec_cik || '',\n      company_domain: item.company_domain || '',\n      time_period_days: item.time_period_days,\n      time_period_label: item.time_period_label,\n      start_date: item.start_date,\n      end_date: item.end_date,\n      source_class: sourceClass,\n      source_domain: extractDomain(doc.url || ''),\n      title: (doc.title || '').toString().slice(0, 500),\n      url: doc.url || '',\n      published_date: doc.published_date || doc.published || '',\n      scraped_at: item.scraped_at,\n      query_used: item[queryField],\n      snippet: (doc.content || '').toString().slice(0, 2000),\n      content_excerpt: body.slice(0, 10000),\n      content_length: body.length,\n      source_rank: idx + 1,\n      duplicate_flag: false,\n      placeholder: false\n    }\n  };\n});\nif (docs.length === 0) {\n  return [{\n    json: {\n      run_id: item.run_id,\n      row_number: item.row_number,\n      company_name: item.company_name,\n      sec_cik: item.sec_cik || '',\n      company_domain: item.company_domain || '',\n      time_period_days: item.time_period_days,\n      time_period_label: item.time_period_label,\n      start_date: item.start_date,\n      end_date: item.end_date,\n      source_class: sourceClass,\n      source_domain: '',\n      title: '',\n      url: '',\n      published_date: '',\n      scraped_at: item.scraped_at,\n      query_used: item[queryField],\n      snippet: '',\n      content_excerpt: '',\n      content_length: 0,\n      source_rank: 0,\n      duplicate_flag: false,\n      placeholder: true\n    }\n  }];\n}\nreturn docs;\n"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        448,
+        848
+      ],
+      "id": "9fba6da6-a6fb-41b1-8a91-de0f1634b34f",
+      "name": "Flatten Think Tank Results"
+    },
+    {
+      "parameters": {
+        "functionCode": "\nconst sourceClass = 'news';\nconst queryField = 'news_query';\nconst item = items[0].json;\nconst results = Array.isArray(item.results) ? item.results : [];\nconst extractDomain = (url = '') => {\n  try { return new URL(url).hostname.replace(/^www\\./, ''); } catch (e) { return ''; }\n};\nconst docs = results.map((doc, idx) => {\n  const body = (doc.raw_content || doc.content || '').toString();\n  return {\n    json: {\n      run_id: item.run_id,\n      row_number: item.row_number,\n      company_name: item.company_name,\n      sec_cik: item.sec_cik || '',\n      company_domain: item.company_domain || '',\n      time_period_days: item.time_period_days,\n      time_period_label: item.time_period_label,\n      start_date: item.start_date,\n      end_date: item.end_date,\n      source_class: sourceClass,\n      source_domain: extractDomain(doc.url || ''),\n      title: (doc.title || '').toString().slice(0, 500),\n      url: doc.url || '',\n      published_date: doc.published_date || doc.published || '',\n      scraped_at: item.scraped_at,\n      query_used: item[queryField],\n      snippet: (doc.content || '').toString().slice(0, 2000),\n      content_excerpt: body.slice(0, 10000),\n      content_length: body.length,\n      source_rank: idx + 1,\n      duplicate_flag: false,\n      placeholder: false\n    }\n  };\n});\nif (docs.length === 0) {\n  return [{\n    json: {\n      run_id: item.run_id,\n      row_number: item.row_number,\n      company_name: item.company_name,\n      sec_cik: item.sec_cik || '',\n      company_domain: item.company_domain || '',\n      time_period_days: item.time_period_days,\n      time_period_label: item.time_period_label,\n      start_date: item.start_date,\n      end_date: item.end_date,\n      source_class: sourceClass,\n      source_domain: '',\n      title: '',\n      url: '',\n      published_date: '',\n      scraped_at: item.scraped_at,\n      query_used: item[queryField],\n      snippet: '',\n      content_excerpt: '',\n      content_length: 0,\n      source_rank: 0,\n      duplicate_flag: false,\n      placeholder: true\n    }\n  }];\n}\nreturn docs;\n"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        448,
+        1088
+      ],
+      "id": "ae23d896-5728-48e3-91cd-570b09669ca4",
+      "name": "Flatten News Results"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        704,
+        480
+      ],
+      "id": "8a4327c5-62e2-402d-b069-9303c2d40b3a",
+      "name": "Append Official + Government"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        832,
+        672
+      ],
+      "id": "ea0639cf-bf73-479c-8b7d-a0465732249c",
+      "name": "Append + Think Tank"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        992,
+        784
+      ],
+      "id": "8a1a4938-6c59-459c-a8f6-b7c3ce745eac",
+      "name": "Append + News"
+    },
+    {
+      "parameters": {
+        "functionCode": "const clean = items\n  .map(i => i.json)\n  .filter(d => !d.placeholder)\n  .filter(d => d.validation_status !== 'rejected')\n  .filter(d => d.url || d.title);\n\nconst normalizeTitle = (title = '') => title.toLowerCase().replace(/\\s+/g, ' ').trim();\nconst seen = new Set();\nconst deduped = [];\n\nfor (const doc of clean) {\n  const key = (doc.url || '').trim() || `${normalizeTitle(doc.title)}|${doc.source_domain}`;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  deduped.push({\n    json: {\n      run_id: doc.run_id,\n      row_number: doc.row_number,\n      company_name: doc.company_name,\n      sec_cik: doc.sec_cik || '',\n      company_domain: doc.company_domain || '',\n      time_period_days: doc.time_period_days,\n      time_period_label: doc.time_period_label,\n      start_date: doc.start_date,\n      end_date: doc.end_date,\n      source_class: doc.source_class,\n      source_domain: doc.source_domain,\n      title: doc.title,\n      url: doc.url,\n      published_date: doc.published_date,\n      actual_doc_date: doc.actual_doc_date || doc.published_date || '',\n      date_source: doc.date_source || '',\n      scraped_at: doc.scraped_at,\n      query_used: doc.query_used,\n      snippet: doc.snippet,\n      content_excerpt: doc.content_excerpt,\n      content_length: doc.content_length,\n      source_rank: doc.source_rank,\n      entity_confidence: doc.entity_confidence || 0,\n      validation_notes: doc.validation_notes || '',\n      validation_status: doc.validation_status || 'accepted',\n      duplicate_flag: false\n    }\n  });\n}\n\nif (deduped.length === 0) {\n  const fallback = items[0]?.json || {};\n  return [{\n    json: {\n      run_id: fallback.run_id || '',\n      row_number: fallback.row_number || '',\n      company_name: fallback.company_name || '',\n      sec_cik: fallback.sec_cik || '',\n      company_domain: fallback.company_domain || '',\n      time_period_days: fallback.time_period_days || '',\n      time_period_label: fallback.time_period_label || '',\n      start_date: fallback.start_date || '',\n      end_date: fallback.end_date || '',\n      source_class: 'none',\n      source_domain: '',\n      title: 'No documents found',\n      url: '',\n      published_date: '',\n      actual_doc_date: '',\n      date_source: '',\n      scraped_at: new Date().toISOString(),\n      query_used: '',\n      snippet: '',\n      content_excerpt: '',\n      content_length: 0,\n      source_rank: 0,\n      entity_confidence: 0,\n      validation_notes: fallback.validation_notes || '',\n      validation_status: 'placeholder',\n      duplicate_flag: false\n    }\n  }];\n}\n\nreturn deduped;"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        400
+      ],
+      "id": "d3755809-0486-4fa2-8b9e-4fe5e4bc4210",
+      "name": "Deduplicate and Tidy Documents"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {
+          "fileName": "={{ $(\"Normalize Inputs\").item.json.company_name }}_validated_documents_{{ $now.toFormat(\"yyyy-MM-dd\") }}.xlsx",
+          "sheetName": "Validated Documents"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1616,
+        -48
+      ],
+      "id": "d1e5a9ab-8859-42b9-9b83-53c5642d7c2b",
+      "name": "Convert Documents to Excel"
+    },
+    {
+      "parameters": {
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1808,
+        -48
+      ],
+      "id": "b238065a-9c3c-4177-87a0-ffe9ba42d722",
+      "name": "Save Excel to Google Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "wMua64M7eafc3M0c",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const docs = items.map(i => i.json);\nconst bySource = { official: [], government: [], thinktank: [], news: [] };\nfor (const doc of docs) {\n  if (bySource[doc.source_class]) bySource[doc.source_class].push(doc);\n}\nconst formatDoc = (doc, idx) => {\n  return [\n    `Document ${idx + 1}`,\n    `Title: ${doc.title || ''}`,\n    `Domain: ${doc.source_domain || ''}`,\n    `URL: ${doc.url || ''}`,\n    `Published: ${doc.actual_doc_date || doc.published_date || ''}`,\n    `Snippet: ${(doc.snippet || '').slice(0, 1000)}`,\n    `Excerpt: ${(doc.content_excerpt || '').slice(0, 3500)}`\n  ].join('\\n');\n};\nconst pack = (arr) => arr.slice(0, 6).map(formatDoc).join('\\n\\n---\\n\\n') || 'No validated documents found for this source class in the selected time period.';\nconst first = docs[0] || {};\nconst counts = {\n  official: bySource.official.length,\n  government: bySource.government.length,\n  thinktank: bySource.thinktank.length,\n  news: bySource.news.length,\n  total: docs.filter(d => d.source_class && d.source_class !== 'none').length\n};\nreturn [{\n  json: {\n    run_id: first.run_id || '',\n    row_number: first.row_number || '',\n    company_name: first.company_name || '',\n    time_period_days: first.time_period_days || '',\n    time_period_label: first.time_period_label || '',\n    start_date: first.start_date || '',\n    end_date: first.end_date || '',\n    doc_stats: counts,\n    official_bundle: pack(bySource.official),\n    government_bundle: pack(bySource.government),\n    thinktank_bundle: pack(bySource.thinktank),\n    news_bundle: pack(bySource.news)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        416
+      ],
+      "id": "1007dfe1-f2d2-4461-9d88-7459d565bbf0",
+      "name": "Aggregate Documents for LLM"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5",
+          "mode": "list",
+          "cachedResultName": "GPT-5"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a deterministic financial and official-source extraction algorithm. Analyze the provided official company, SEC, investor relations, and press release materials. Extract concrete operating updates, capital allocation signals, and exact regulatory issues. Ignore generic boilerplate and do not add commentary.\n\nReturn only valid JSON with this schema:\n{\n  \"financial_health_baseline\": \"string\",\n  \"strategic_pain_points\": [\"string\"],\n  \"upcoming_capital_allocations\": [\"string\"],\n  \"specific_regulatory_hurdles\": [\"string\"]\n}"
+            },
+            {
+              "content": "={{ $json.official_bundle }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        1776,
+        224
+      ],
+      "id": "53f7ebfb-c28b-4928-8c62-213a93ae6ff4",
+      "name": "LLM 1 - Official / Financial Extractor",
+      "credentials": {
+        "openAiApi": {
+          "id": "mYD2FoA4JGnKUTS9",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a deterministic political compliance and government affairs extraction algorithm. Analyze the provided procurement, lobbying, and public sector materials. Extract specific agencies, contracts, policy targets, and government-facing risks. Ignore generic statements and do not add commentary.\n\nReturn only valid JSON with this schema:\n{\n  \"political_footprint_baseline\": \"string\",\n  \"targeted_legislation_and_policies\": [\"string\"],\n  \"key_government_contracts\": [\"string\"],\n  \"lobbying_expenditures_and_agencies\": [\"string\"]\n}"
+            },
+            {
+              "content": "={{ $json.government_bundle }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          },
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        1776,
+        416
+      ],
+      "id": "7cf08bd8-79cb-4edc-a1f5-6a3562d57129",
+      "name": "LLM 2 - Government Extractor",
+      "credentials": {
+        "openAiApi": {
+          "id": "mYD2FoA4JGnKUTS9",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a deterministic policy and strategic risk extraction algorithm. Analyze the provided think tank reports and policy materials. Extract emerging regulatory trends, geopolitical risk signals, trade or sanctions risks, and concrete recommendations from policy actors. Do not add commentary.\n\nReturn only valid JSON with this schema:\n{\n  \"policy_landscape_baseline\": \"string\",\n  \"emerging_regulatory_threats\": [\"string\"],\n  \"geopolitical_and_trade_risks\": [\"string\"],\n  \"strategic_recommendations_extracted\": [\"string\"]\n}"
+            },
+            {
+              "content": "={{ $json.thinktank_bundle }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          },
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        1776,
+        592
+      ],
+      "id": "11aa1c24-8474-4a55-a6ee-5fe90f0f3a05",
+      "name": "LLM 3 - Think Tank Extractor",
+      "credentials": {
+        "openAiApi": {
+          "id": "mYD2FoA4JGnKUTS9",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5.4",
+          "mode": "list",
+          "cachedResultName": "GPT-5.4"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a deterministic company news extraction algorithm. Analyze the provided news coverage. Extract specific events, business moves, legal issues, market signals, and named counterparties. Ignore generic repetition and marketing language. Do not add commentary.\n\nReturn only valid JSON with this schema:\n{\n  \"news_baseline\": \"string\",\n  \"major_events\": [\"string\"],\n  \"legal_or_regulatory_events\": [\"string\"],\n  \"market_and_competitor_signals\": [\"string\"]\n}"
+            },
+            {
+              "content": "={{ $json.news_bundle }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          },
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        1776,
+        768
+      ],
+      "id": "146c863f-c30a-4cd5-acff-212b972bab92",
+      "name": "LLM 4 - News Extractor",
+      "credentials": {
+        "openAiApi": {
+          "id": "mYD2FoA4JGnKUTS9",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "\nconst parsed = items[0].json.output?.[0]?.content?.[0]?.text || {};\nreturn [{ json: { official_analysis: parsed } }];\n"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2112,
+        224
+      ],
+      "id": "2e1499d3-b0d3-446a-a633-4e2c64c39348",
+      "name": "Parse Official Extractor Output"
+    },
+    {
+      "parameters": {
+        "functionCode": "\nconst parsed = items[0].json.output?.[0]?.content?.[0]?.text || {};\nreturn [{ json: { government_analysis: parsed } }];\n"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2128,
+        416
+      ],
+      "id": "3e793372-ea52-451f-9d6b-7aa99382c259",
+      "name": "Parse Government Extractor Output"
+    },
+    {
+      "parameters": {
+        "functionCode": "\nconst parsed = items[0].json.output?.[0]?.content?.[0]?.text || {};\nreturn [{ json: { thinktank_analysis: parsed } }];\n"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2144,
+        608
+      ],
+      "id": "393b5d8d-b864-43ca-aba8-1d171a4e81a9",
+      "name": "Parse Think Tank Extractor Output"
+    },
+    {
+      "parameters": {
+        "functionCode": "\nconst parsed = items[0].json.output?.[0]?.content?.[0]?.text || {};\nreturn [{ json: { news_analysis: parsed } }];\n"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2144,
+        784
+      ],
+      "id": "835274a4-3de1-4691-8377-5bea6fcd8d6b",
+      "name": "Parse News Extractor Output"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 7,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2304,
+        1104
+      ],
+      "id": "a89be2ac-f224-44d8-8ff9-eab8da9936ae",
+      "name": "Merge Final Packet"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5.4",
+          "mode": "list",
+          "cachedResultName": "GPT-5.4"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are the final CSIS-facing company briefing writer and expert-matching engine.\n\nYou will receive a structured JSON packet containing:\n- run metadata and document statistics\n- official/regulatory analysis\n- government and lobbying analysis\n- think tank and policy analysis\n- news analysis\n- a past CSIS engagement memo for the company when available\n- a CSIS experts catalogue bundle\n\nProduce only valid JSON with the following schema:\n{\n  \"recent_developments_paragraph\": \"string\",\n  \"past_csis_engagement_paragraph\": \"string\",\n  \"csis_convergence_paragraph\": \"string\",\n  \"email_pitch_ideas\": [\"string\", \"string\", \"string\"],\n  \"final_one_pager\": \"string\"\n}\n\nRequirements:\n- Write in plain English, but make each paragraph dense, specific, and useful.\n- recent_developments_paragraph must be one dense paragraph summarizing the most important recent company, sector, regional, and policy developments grounded in the current-source analysis only.\n- past_csis_engagement_paragraph must be one dense paragraph summarizing what the company previously reached out about, what meetings or briefings were about, and what this suggests about how they used CSIS. Use the company note only. If no company note exists, say so briefly.\n- csis_convergence_paragraph must be one dense paragraph that connects a recent development affecting the company, region, or sector to relevant CSIS expertise and likely prior CSIS reporting or programs, and explain what kinds of questions CSIS could answer for the company. Mention exact CSIS expert names only if they appear in the experts bundle.\n- email_pitch_ideas must contain 2 or 3 concise pitch ideas. Each idea should sound like an outreach angle for a potential email. Each item should mention a current trigger or development, what kind of CSIS meeting or briefing could be offered, and what questions CSIS could help answer.\n- final_one_pager must combine the output into a polished one-pager with this structure exactly:\n\n1. Recent Developments\n<recent_developments_paragraph>\n\n2. Past CSIS Engagements\n<past_csis_engagement_paragraph>\n\n3. Why This Matters for CSIS\n<csis_convergence_paragraph>\n\n4. Potential Email Pitch Ideas\n- <idea 1>\n- <idea 2>\n- <idea 3 if available>\n\n- Do not invent facts, meetings, experts, or reports.\n- Use only experts present in the CSIS experts bundle.\n- Make the result specific to the company, not generic to the sector."
+            },
+            {
+              "content": "={{ JSON.stringify($json, null, 2) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          },
+          "temperature": 0.4
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        2528,
+        1104
+      ],
+      "id": "f13db1ff-27b5-451e-b327-2ab81160d3d5",
+      "name": "LLM 5 (Final Strategist)",
+      "credentials": {
+        "openAiApi": {
+          "id": "mYD2FoA4JGnKUTS9",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const parsed = items[0].json.output?.[0]?.content?.[0]?.text || {};\nconst ideas = Array.isArray(parsed.email_pitch_ideas)\n  ? parsed.email_pitch_ideas.filter(Boolean)\n  : [];\nreturn [{\n  json: {\n    ...items[0].json,\n    recent_developments_paragraph: parsed.recent_developments_paragraph || '',\n    past_csis_engagement_paragraph: parsed.past_csis_engagement_paragraph || '',\n    csis_convergence_paragraph: parsed.csis_convergence_paragraph || '',\n    email_pitch_ideas: ideas.join('\\n- '),\n    final_one_pager: parsed.final_one_pager || ''\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2912,
+        960
+      ],
+      "id": "22af952c-6ff1-4869-81ec-cd28d205f9c1",
+      "name": "Parse Final Strategist Output"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1tmfRQViTQHB4aheAK0DT3RSSgrR0NCrBOPfdI4XUDEA",
+          "mode": "list",
+          "cachedResultName": "data_base_v1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tmfRQViTQHB4aheAK0DT3RSSgrR0NCrBOPfdI4XUDEA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tmfRQViTQHB4aheAK0DT3RSSgrR0NCrBOPfdI4XUDEA/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $('Loop Over Requests').item.json.row_number || '' }}",
+            "run_id": "={{ $('Normalize Inputs').item.json.run_id }}",
+            "company_name": "={{ $('Normalize Inputs').item.json.company_name }}",
+            "time_period_label": "={{ $('Normalize Inputs').item.json.time_period_label }}",
+            "time_period_days": "={{ $('Normalize Inputs').item.json.time_period_days }}",
+            "status": "Completed",
+            "requested_at": "={{ $('Loop Over Requests').item.json.requested_at || '' }}",
+            "started_at": "={{ $('Normalize Inputs').item.json.scraped_at }}",
+            "finished_at": "={{ $now }}",
+            "notes": "={{ $('Loop Over Requests').item.json.notes || '' }}",
+            "last_updated": "={{ $now }}",
+            "objective_facts": "={{ $json.recent_developments_paragraph || \"\" }}",
+            "strategic_decision": "={{ $json.email_pitch_ideas || \"\" }}",
+            "past_csis_engagement_summary": "={{ $json.past_csis_engagement_paragraph || \"\" }}",
+            "csis_convergence": "={{ $json.csis_convergence_paragraph || \"\" }}",
+            "recent_developments_paragraph": "={{ $json.recent_developments_paragraph }}",
+            "past_csis_engagement_paragraph": "={{ $json.past_csis_engagement_paragraph }}",
+            "csis_convergence_paragraph": "={{ $json.csis_convergence_paragraph }}",
+            "email_pitch_ideas": "={{ $json.email_pitch_ideas ? ('- ' + $json.email_pitch_ideas) : '' }}",
+            "final_one_pager": "={{ $json.final_one_pager }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "run_id",
+              "displayName": "run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company_name",
+              "displayName": "company_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "time_period_label",
+              "displayName": "time_period_label",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "time_period_days",
+              "displayName": "time_period_days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "requested_at",
+              "displayName": "requested_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "started_at",
+              "displayName": "started_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "finished_at",
+              "displayName": "finished_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_updated",
+              "displayName": "last_updated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "objective_facts",
+              "displayName": "objective_facts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "strategic_decision",
+              "displayName": "strategic_decision",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "past_csis_engagement_summary",
+              "displayName": "past_csis_engagement_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "future_interest_hypothesis",
+              "displayName": "future_interest_hypothesis",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "csis_convergence",
+              "displayName": "csis_convergence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "recommended_experts",
+              "displayName": "recommended_experts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sec_cik",
+              "displayName": "sec_cik",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "company_domain",
+              "displayName": "company_domain",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "recent_developments_paragraph",
+              "displayName": "recent_developments_paragraph",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "past_csis_engagement_paragraph",
+              "displayName": "past_csis_engagement_paragraph",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "csis_convergence_paragraph",
+              "displayName": "csis_convergence_paragraph",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_pitch_ideas",
+              "displayName": "email_pitch_ideas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "final_one_pager",
+              "displayName": "final_one_pager",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3072,
+        1376
+      ],
+      "id": "04a98fc9-215c-4dcc-a776-3fa6b96bdb6c",
+      "name": "Append results to data_base_v1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ioJPOsOy0yEEoWVv",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const docs = items.map(i => i.json);\nconst first = docs[0] || {};\n\nconst company = (first.company_name || '').toString().trim();\nconst companyNorm = company.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();\nconst companyTokens = companyNorm.split(' ').filter(t => t.length > 2);\nconst secCik = (first.sec_cik || '').toString().replace(/\\D/g, '');\nconst shortCik = secCik.replace(/^0+/, '');\nconst companyDomain = (first.company_domain || '').toString().toLowerCase().replace(/^www\\./, '');\nconst start = new Date(`${first.start_date}T00:00:00Z`);\nconst end = new Date(`${first.end_date}T23:59:59Z`);\nconst endYear = end.getUTCFullYear();\n\nconst monthMap = {\n  january: 1, jan: 1, february: 2, feb: 2, march: 3, mar: 3, april: 4, apr: 4, may: 5,\n  june: 6, jun: 6, july: 7, jul: 7, august: 8, aug: 8, september: 9, sept: 9, sep: 9,\n  october: 10, oct: 10, november: 11, nov: 11, december: 12, dec: 12\n};\n\nfunction hostname(url = '') {\n  try { return new URL(url).hostname.toLowerCase().replace(/^www\\./, ''); } catch (e) { return ''; }\n}\n\nfunction normalize(text = '') {\n  return text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();\n}\n\nfunction companyScore(doc) {\n  const text = [doc.title, doc.snippet, (doc.content_excerpt || '').slice(0, 1500), doc.url].join(' ');\n  const n = normalize(text);\n  if (!companyNorm) return 0;\n  let score = 0;\n  if (n.includes(companyNorm)) score += 0.7;\n  const tokenMatches = companyTokens.filter(t => n.includes(t)).length;\n  if (companyTokens.length) score += Math.min(0.3, tokenMatches / companyTokens.length * 0.3);\n  if ((doc.url || '').toLowerCase().includes(companyNorm.replace(/\\s+/g, '-'))) score += 0.1;\n  return Math.min(1, score);\n}\n\nfunction parseDateValue(raw) {\n  if (!raw) return null;\n  const value = raw.toString().trim();\n  if (!value) return null;\n  const direct = new Date(value);\n  if (!Number.isNaN(direct.getTime())) return direct;\n  const iso = value.match(/(20\\d{2})-(\\d{2})-(\\d{2})/);\n  if (iso) return new Date(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00Z`);\n  const mdy = value.match(/(\\d{1,2})\\/(\\d{1,2})\\/(20\\d{2})/);\n  if (mdy) return new Date(`${mdy[3]}-${mdy[1].padStart(2,'0')}-${mdy[2].padStart(2,'0')}T00:00:00Z`);\n  return null;\n}\n\nfunction parseTopTextDate(text = '') {\n  const sample = text.slice(0, 2000);\n  let m = sample.match(/\\b(20\\d{2})-(\\d{2})-(\\d{2})\\b/);\n  if (m) return { date: new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00Z`), source: 'text_iso' };\n  m = sample.match(/\\b(\\d{1,2})\\/(\\d{1,2})\\/(20\\d{2})\\b/);\n  if (m) return { date: new Date(`${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}T00:00:00Z`), source: 'text_mdy' };\n  m = sample.match(/\\b(January|Jan|February|Feb|March|Mar|April|Apr|May|June|Jun|July|Jul|August|Aug|September|Sept|Sep|October|Oct|November|Nov|December|Dec)\\.?\\s+(\\d{1,2}),\\s+(20\\d{2})\\b/i);\n  if (m) {\n    const month = monthMap[m[1].toLowerCase()];\n    return { date: new Date(`${m[3]}-${String(month).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}T00:00:00Z`), source: 'text_month_day_year' };\n  }\n  m = sample.match(/\\b(\\d{1,2})\\s+(January|Jan|February|Feb|March|Mar|April|Apr|May|June|Jun|July|Jul|August|Aug|September|Sept|Sep|October|Oct|November|Nov|December|Dec)\\s+(20\\d{2})\\b/i);\n  if (m) {\n    const month = monthMap[m[2].toLowerCase()];\n    return { date: new Date(`${m[3]}-${String(month).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}T00:00:00Z`), source: 'text_day_month_year' };\n  }\n  return null;\n}\n\nfunction parseUrlDate(url = '') {\n  let m = url.match(/\\/(20\\d{2})\\/(\\d{1,2})\\/(\\d{1,2})(?:\\/|$)/);\n  if (m) return { date: new Date(`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}T00:00:00Z`), source: 'url_path' };\n  m = url.match(/(20\\d{2})-(\\d{2})-(\\d{2})/);\n  if (m) return { date: new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00Z`), source: 'url_slug' };\n  return null;\n}\n\nfunction bestDate(doc) {\n  const pd = parseDateValue(doc.published_date);\n  if (pd) return { date: pd, source: 'published_date' };\n  const fromText = parseTopTextDate([doc.title, doc.snippet, (doc.content_excerpt || '').slice(0, 1500)].join(' '));\n  if (fromText) return fromText;\n  const fromUrl = parseUrlDate(doc.url || '');\n  if (fromUrl) return fromUrl;\n  return null;\n}\n\nfunction inWindow(date) {\n  return date && date >= start && date <= end;\n}\n\nconst accepted = [];\nconst rejected = [];\n\nfor (let idx = 0; idx < docs.length; idx++) {\n  const doc = docs[idx];\n  if (doc.placeholder) continue;\n  const domain = hostname(doc.url || doc.source_domain || '');\n  const score = companyScore(doc);\n  const dated = bestDate(doc);\n  const actualDate = dated ? dated.date.toISOString().slice(0, 10) : '';\n  const reasons = [];\n\n  if (score < 0.45) reasons.push('weak_company_match');\n  if (!dated) reasons.push('missing_reliable_date');\n  if (dated && !inWindow(dated.date)) reasons.push('outside_requested_window');\n\n  if (doc.source_class === 'official') {\n    if ((doc.url || '').includes('/edgar/browse/')) reasons.push('edgar_entity_landing_page');\n    if (domain === 'sec.gov' && secCik) {\n      const url = (doc.url || '').toLowerCase();\n      if (!url.includes(`/data/${shortCik}/`) && !url.includes(`cik=${shortCik}`) && !url.includes(`cik=${secCik}`)) {\n        reasons.push('sec_cik_mismatch');\n      }\n    }\n    if (companyDomain && domain && domain !== 'sec.gov' && domain !== 'businesswire.com' && domain !== 'prnewswire.com' && domain !== 'globenewswire.com') {\n      if (!(domain === companyDomain || domain.endsWith(`.${companyDomain}`))) reasons.push('non_company_official_domain');\n    }\n  }\n\n  if (doc.source_class === 'government' && domain.includes('opensecrets.org')) {\n    const cycleMatch = (doc.url || '').match(/[?&]cycle=(20\\d{2})/);\n    if (cycleMatch && Number(cycleMatch[1]) < endYear - 1) reasons.push('old_opensecrets_cycle');\n  }\n\n  const output = {\n    ...doc,\n    source_domain: domain || doc.source_domain || '',\n    actual_doc_date: actualDate,\n    date_source: dated ? dated.source : '',\n    entity_confidence: Number(score.toFixed(2)),\n    validation_notes: reasons.join('|'),\n    validation_status: reasons.length ? 'rejected' : 'accepted',\n    placeholder: false\n  };\n\n  if (reasons.length) rejected.push({ json: output, pairedItem: { item: idx } });\n  else accepted.push({ json: output, pairedItem: { item: idx } });\n}\n\nif (accepted.length === 0) {\n  return [{\n    pairedItem: { item: 0 },\n    json: {\n      run_id: first.run_id || '',\n      row_number: first.row_number || '',\n      company_name: first.company_name || '',\n      sec_cik: first.sec_cik || '',\n      company_domain: first.company_domain || '',\n      time_period_days: first.time_period_days || '',\n      time_period_label: first.time_period_label || '',\n      start_date: first.start_date || '',\n      end_date: first.end_date || '',\n      source_class: 'none',\n      source_domain: '',\n      title: 'No validated documents found within the requested window',\n      url: '',\n      published_date: '',\n      actual_doc_date: '',\n      date_source: '',\n      scraped_at: new Date().toISOString(),\n      query_used: '',\n      snippet: '',\n      content_excerpt: '',\n      content_length: 0,\n      source_rank: 0,\n      duplicate_flag: false,\n      entity_confidence: 0,\n      validation_notes: rejected.length ? 'all_documents_rejected_by_validation' : 'no_documents_found',\n      validation_status: 'placeholder',\n      placeholder: true\n    }\n  }];\n}\n\nreturn accepted;"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        784
+      ],
+      "id": "5c46ba26-9e49-41f2-a006-794aa69352bc",
+      "name": "Validate Dates and Company Match"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1tmfRQViTQHB4aheAK0DT3RSSgrR0NCrBOPfdI4XUDEA",
+          "mode": "list",
+          "cachedResultName": "data_base_v1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tmfRQViTQHB4aheAK0DT3RSSgrR0NCrBOPfdI4XUDEA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 352252327,
+          "mode": "list",
+          "cachedResultName": "Company_Notes",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tmfRQViTQHB4aheAK0DT3RSSgrR0NCrBOPfdI4XUDEA/edit#gid=352252327"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        0,
+        0
+      ],
+      "id": "0b95726a-707d-499e-9dee-453a73341e9a",
+      "name": "Read Company Notes",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ioJPOsOy0yEEoWVv",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const target = (($('Normalize Inputs').item.json.company_name || '') + '').trim().toLowerCase();\nconst rows = items.map(i => i.json || {});\nconst match = rows.find(r => (((r.company_name || r.Company || '') + '').trim().toLowerCase() === target)) || {};\nconst note = {\n  company_name: match.company_name || match.Company || $('Normalize Inputs').item.json.company_name || '',\n  industries: match.industries || match['What industries are they in'] || '',\n  operating_regions: match.operating_regions || match['Where do they operate'] || '',\n  sensitivities: match.other_sensitivities || match['Other sensitivities'] || '',\n  requested_briefings: match.requested_briefings || match['What have they requested briefings on'] || '',\n  future_interests: match.future_interests || match['Best Guess for Future Interests'] || ''\n};\nconst hasNote = Object.values(note).some(v => (v || '').toString().trim() !== '');\nconst bundle = hasNote\n  ? [\n      `Company: ${note.company_name}`,\n      `Industries: ${note.industries}`,\n      `Where they operate: ${note.operating_regions}`,\n      `Other sensitivities: ${note.sensitivities}`,\n      `Requested briefings: ${note.requested_briefings}`,\n      `Best guess for future interests: ${note.future_interests}`\n    ].join('\\n')\n  : 'No past CSIS engagement memo found for this company.';\nreturn [{\n  json: {\n    company_note_found: hasNote,\n    company_note_struct: note,\n    company_note_bundle: bundle\n  },\n  pairedItem: { item: 0 }\n}];"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "id": "72ff6d42-befd-417e-90a1-4940b7647b4a",
+      "name": "Select Company Note"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1tmfRQViTQHB4aheAK0DT3RSSgrR0NCrBOPfdI4XUDEA",
+          "mode": "list",
+          "cachedResultName": "data_base_v1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tmfRQViTQHB4aheAK0DT3RSSgrR0NCrBOPfdI4XUDEA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1786257751,
+          "mode": "list",
+          "cachedResultName": "CSIS_Experts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tmfRQViTQHB4aheAK0DT3RSSgrR0NCrBOPfdI4XUDEA/edit#gid=1786257751"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        0,
+        208
+      ],
+      "id": "ee826804-20e2-479e-a798-5473b16a1c3e",
+      "name": "Read CSIS Experts",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ioJPOsOy0yEEoWVv",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const rows = items.map(i => i.json || {}).filter(r => (r.expert_name || r['Expert Name'] || '').toString().trim());\nconst fmt = (r, idx) => {\n  const name = r.expert_name || r['Expert Name'] || '';\n  const bio = (r.bio || r.Bio || '').toString().slice(0, 1200);\n  const prev = (r.previous_experience || r['Previous Experience'] || '').toString().slice(0, 800);\n  const topics = (r.topics || r.Topics || '').toString();\n  return [\n    `Expert ${idx + 1}`,\n    `Name: ${name}`,\n    `Topics: ${topics}`,\n    `Bio: ${bio}`,\n    `Previous experience: ${prev}`\n  ].join('\\n');\n};\nconst bundle = rows.map(fmt).join('\\n\\n---\\n\\n');\nreturn [{\n  json: {\n    csis_experts_count: rows.length,\n    csis_experts_bundle: bundle || 'No CSIS experts rows were found.'\n  },\n  pairedItem: { item: 0 }\n}];"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        240,
+        208
+      ],
+      "id": "68271d87-5cac-425d-a1ad-a5f0585d65ea",
+      "name": "Aggregate CSIS Experts"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get pending requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get pending requests": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Inputs": {
+      "main": [
+        [
+          {
+            "node": "Search Official / Regulatory Sources",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Official Meta + Results",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Search Government / Lobbying Sources",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Government Meta + Results",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Search Think Tank / Policy Sources",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Think Tank Meta + Results",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Search News Sources",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge News Meta + Results",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Company Notes",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read CSIS Experts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Official / Regulatory Sources": {
+      "main": [
+        [
+          {
+            "node": "Merge Official Meta + Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Search Government / Lobbying Sources": {
+      "main": [
+        [
+          {
+            "node": "Merge Government Meta + Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Search Think Tank / Policy Sources": {
+      "main": [
+        [
+          {
+            "node": "Merge Think Tank Meta + Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Search News Sources": {
+      "main": [
+        [
+          {
+            "node": "Merge News Meta + Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Official Meta + Results": {
+      "main": [
+        [
+          {
+            "node": "Flatten Official Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Government Meta + Results": {
+      "main": [
+        [
+          {
+            "node": "Flatten Government Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Think Tank Meta + Results": {
+      "main": [
+        [
+          {
+            "node": "Flatten Think Tank Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge News Meta + Results": {
+      "main": [
+        [
+          {
+            "node": "Flatten News Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Official Results": {
+      "main": [
+        [
+          {
+            "node": "Append Official + Government",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Government Results": {
+      "main": [
+        [
+          {
+            "node": "Append Official + Government",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Append Official + Government": {
+      "main": [
+        [
+          {
+            "node": "Append + Think Tank",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Think Tank Results": {
+      "main": [
+        [
+          {
+            "node": "Append + Think Tank",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Append + Think Tank": {
+      "main": [
+        [
+          {
+            "node": "Append + News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten News Results": {
+      "main": [
+        [
+          {
+            "node": "Append + News",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Append + News": {
+      "main": [
+        [
+          {
+            "node": "Validate Dates and Company Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deduplicate and Tidy Documents": {
+      "main": [
+        [
+          {
+            "node": "Convert Documents to Excel",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Aggregate Documents for LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Documents to Excel": {
+      "main": [
+        [
+          {
+            "node": "Save Excel to Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Documents for LLM": {
+      "main": [
+        [
+          {
+            "node": "LLM 1 - Official / Financial Extractor",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "LLM 2 - Government Extractor",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "LLM 3 - Think Tank Extractor",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "LLM 4 - News Extractor",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Final Packet",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "LLM 1 - Official / Financial Extractor": {
+      "main": [
+        [
+          {
+            "node": "Parse Official Extractor Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM 2 - Government Extractor": {
+      "main": [
+        [
+          {
+            "node": "Parse Government Extractor Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM 3 - Think Tank Extractor": {
+      "main": [
+        [
+          {
+            "node": "Parse Think Tank Extractor Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM 4 - News Extractor": {
+      "main": [
+        [
+          {
+            "node": "Parse News Extractor Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Official Extractor Output": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Packet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Government Extractor Output": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Packet",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Parse Think Tank Extractor Output": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Packet",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Parse News Extractor Output": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Packet",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Merge Final Packet": {
+      "main": [
+        [
+          {
+            "node": "LLM 5 (Final Strategist)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM 5 (Final Strategist)": {
+      "main": [
+        [
+          {
+            "node": "Parse Final Strategist Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Final Strategist Output": {
+      "main": [
+        [
+          {
+            "node": "Append results to data_base_v1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append results to data_base_v1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Dates and Company Match": {
+      "main": [
+        [
+          {
+            "node": "Deduplicate and Tidy Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Company Notes": {
+      "main": [
+        [
+          {
+            "node": "Select Company Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read CSIS Experts": {
+      "main": [
+        [
+          {
+            "node": "Aggregate CSIS Experts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Company Note": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Packet",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Aggregate CSIS Experts": {
+      "main": [
+        [
+          {
+            "node": "Merge Final Packet",
+            "type": "main",
+            "index": 6
+          }
+        ]
+      ]
+    },
+    "Loop Over Requests": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Normalize Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a97c2567-bc4d-40a0-9118-d311e777f606",
+  "meta": {
+    "instanceId": "f5127ba5190b28622a8fa2739b250a526f0290de8dc2d67340147bae71e72fab"
+  },
+  "id": "q3QNRHceBdqo3WlI",
+  "tags": []
+}

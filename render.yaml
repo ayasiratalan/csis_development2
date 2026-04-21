@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: csis-company-memo-dashboard
+    env: node
+    plan: starter
+    buildCommand: ""
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: WORKFLOW_MODE
+        value: webhook
+      - key: N8N_WEBHOOK_URL
+        sync: false
+      - key: N8N_AUTH_HEADER
+        sync: false
+      - key: N8N_AUTH_VALUE
+        sync: false

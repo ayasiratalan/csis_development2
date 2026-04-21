@@ -1,0 +1,12 @@
+{
+  "name": "csis-corporate-memo-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CSIS-styled dashboard for launching company memo workflows and displaying validated sources.",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}

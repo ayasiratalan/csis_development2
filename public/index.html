@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CSIS Corporate Memo Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <div class="bg-mark">CSIS</div>
+      <div class="bg-grid"></div>
+
+      <header class="hero">
+        <div class="eyebrow">Center for Strategic &amp; International Studies</div>
+        <h1>Corporate Memo Dashboard</h1>
+        <p class="hero-copy">
+          Launch a company intelligence run, generate a one-page memo, and review
+          the validated source set in one screen.
+        </p>
+        <div class="mode-chip" id="mode-chip">Loading workflow mode...</div>
+      </header>
+
+      <main class="dashboard">
+        <section class="control-panel">
+          <div class="panel-heading">
+            <h2>Run Request</h2>
+            <p>Choose one company and one time window.</p>
+          </div>
+
+          <div class="selector-block">
+            <span class="selector-label">Company</span>
+            <div class="pill-row" id="company-options">
+              <button class="pill active" data-company="chevron">Chevron</button>
+              <button class="pill" data-company="exxon">Exxon</button>
+            </div>
+          </div>
+
+          <div class="selector-block">
+            <span class="selector-label">Time Interval</span>
+            <div class="pill-row" id="interval-options">
+              <button class="pill active" data-interval="14">14 days</button>
+              <button class="pill" data-interval="30">30 days</button>
+              <button class="pill" data-interval="60">60 days</button>
+            </div>
+          </div>
+
+          <button class="generate-button" id="generate-button">
+            Run Workflow
+          </button>
+
+          <div class="status-box" id="status-box">
+            Ready to generate a memo.
+          </div>
+        </section>
+
+        <section class="results-panel" id="results-panel" hidden>
+          <div class="results-header">
+            <div>
+              <div class="eyebrow">Memo Output</div>
+              <h2 id="memo-title">Memo</h2>
+            </div>
+            <div class="run-meta" id="run-meta"></div>
+          </div>
+
+          <article class="memo-card">
+            <div class="memo-body" id="memo-body"></div>
+          </article>
+
+          <section class="sources-card">
+            <div class="sources-header">
+              <div>
+                <div class="eyebrow">Validated Sources</div>
+                <h3>Supporting Documents</h3>
+              </div>
+              <div class="file-chip" id="file-chip"></div>
+            </div>
+            <div class="sources-list" id="sources-list"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
