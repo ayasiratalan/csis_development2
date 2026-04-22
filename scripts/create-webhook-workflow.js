@@ -174,6 +174,13 @@ updateNode("Normalize Inputs", (node) => {
       "  'politico.com', 'thehill.com', 'semafor.com', 'nikkei.com', 'asia.nikkei.com',",
       "  'economist.com', 'finance.yahoo.com', 'prnewswire.com', 'businesswire.com', 'globenewswire.com'",
       "];",
+      "const semiconductorNewsDomains = [",
+      "  'semianalysis.com', 'semiconductor-digest.com', 'eetimes.com', 'electronicsweekly.com',",
+      "  'tomshardware.com', 'anandtech.com', 'theverge.com', 'techcrunch.com', 'wired.com',",
+      "  'lightreading.com', 'fierce-network.com', 'rcrwireless.com', 'mobileworldlive.com',",
+      "  'androidauthority.com', 'gsmarena.com', '9to5google.com', 'digitimes.com',",
+      "  'scmp.com', 'theregister.com', 'venturebeat.com'",
+      "];",
       "const companyProfiles = {",
       "  adm: { domain: 'adm.com', aliases: ['Archer Daniels Midland'], official_domains: ['adm.com'], news_domains: globalNewsDomains },",
       "  bhp: { domain: 'bhp.com', aliases: ['BHP Group'], official_domains: ['bhp.com'], news_domains: globalNewsDomains },",
@@ -182,7 +189,7 @@ updateNode("Normalize Inputs", (node) => {
       "  chevron: { domain: 'chevron.com', aliases: ['Chevron Corporation'], official_domains: ['chevron.com'], news_domains: globalNewsDomains },",
       "  cisco: { domain: 'cisco.com', aliases: ['Cisco Systems'], official_domains: ['cisco.com', 'newsroom.cisco.com'], news_domains: globalNewsDomains },",
       "  merck: { domain: 'merck.com', aliases: ['Merck & Co.', 'MSD'], official_domains: ['merck.com'], news_domains: globalNewsDomains },",
-      "  qualcomm: { domain: 'qualcomm.com', aliases: ['Qualcomm Incorporated'], official_domains: ['qualcomm.com'], news_domains: globalNewsDomains },",
+      "  qualcomm: { domain: 'qualcomm.com', aliases: ['Qualcomm Incorporated', 'Qualcomm Technologies', 'Snapdragon', 'Qualcomm AI', 'Qualcomm CDMA Technologies'], official_domains: ['qualcomm.com', 'investor.qualcomm.com'], news_domains: [...globalNewsDomains, ...semiconductorNewsDomains] },",
       "  nvidia: { domain: 'nvidia.com', aliases: ['NVIDIA Corporation'], official_domains: ['nvidia.com', 'nvidianews.nvidia.com'], news_domains: globalNewsDomains },",
       "  microsoft: { domain: 'microsoft.com', aliases: ['Microsoft Corporation'], official_domains: ['microsoft.com', 'news.microsoft.com'], news_domains: globalNewsDomains },",
       "  ibm: { domain: 'ibm.com', aliases: ['International Business Machines'], official_domains: ['ibm.com', 'newsroom.ibm.com'], news_domains: globalNewsDomains },",
@@ -235,8 +242,8 @@ updateNode("Normalize Inputs", (node) => {
       "const governmentQuery = `(${quotedCompanyNames}) (\"LD-2\" OR lobbying OR procurement OR \"Senate lobbying\" OR \"Federal Register\")`;",
       "const thinktankQuery = `(${quotedCompanyNames}) (regulation OR policy OR analysis OR briefing OR strategic risk)`;",
       "const announcementQuery = `(${quotedCompanyNames}) (announcement OR \"press release\" OR \"news release\" OR contract OR award OR order OR partnership OR investment OR launch OR acquisition OR divestiture OR lawsuit OR earnings)`;",
-      "const targetedNewsQuery = `(${quotedCompanyNames}) (earnings OR acquisition OR divestiture OR lawsuit OR regulation OR contract OR partnership OR investment OR launch OR order OR award OR \"press release\" OR \"news release\" OR geopolitical OR supply chain OR policy)`;",
-      "const newsQuery = `(${quotedCompanyNames}) (earnings OR acquisition OR divestiture OR lawsuit OR regulation OR contract OR partnership OR investment OR launch OR order OR award OR geopolitical OR supply chain OR policy)`;",
+      "const targetedNewsQuery = `(${quotedCompanyNames}) (earnings OR acquisition OR divestiture OR lawsuit OR regulation OR contract OR partnership OR investment OR launch OR order OR award OR \"press release\" OR \"news release\" OR geopolitical OR supply chain OR policy OR chip OR chips OR semiconductor OR AI OR automotive OR handset OR modem OR licensing)`;",
+      "const newsQuery = `(${quotedCompanyNames}) (earnings OR acquisition OR divestiture OR lawsuit OR regulation OR contract OR partnership OR investment OR launch OR order OR award OR geopolitical OR supply chain OR policy OR chip OR chips OR semiconductor OR AI OR automotive OR handset OR modem OR licensing)`;",
       "const newsDomains = dedup([...(profile.news_domains || globalNewsDomains)]);"
     ].join("\n")
   );
@@ -292,7 +299,7 @@ updateNode("Search News Sources", (node) => {
   node.position = [-32, 1264];
   node.parameters.jsonBody = tavilyBody("news_query", {
     topic: "news",
-    maxResults: 18
+    maxResults: 30
   });
 });
 
@@ -316,7 +323,7 @@ copyNode("Search Broad News Sources", {
     jsonBody: tavilyBody("announcement_query", {
       topic: "general",
       includeDomainsField: "official_domains",
-      maxResults: 14
+      maxResults: 20
     })
   }
 });
@@ -345,7 +352,7 @@ copyNode("Search Broad News Sources", {
     jsonBody: tavilyBody("targeted_news_query", {
       topic: "news",
       includeDomainsField: "news_domains",
-      maxResults: 16
+      maxResults: 30
     })
   }
 });

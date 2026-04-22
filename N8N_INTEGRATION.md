@@ -131,6 +131,8 @@ The discovery branches are:
 - `Search Curated News Sites`: searches a fixed set of major news/wire sources.
 - `Search Broad News Sources`: searches broader Tavily news results without domain restriction.
 
+For semiconductor and technology companies such as Qualcomm, the workflow adds sector-specific sources to the curated news list, including semiconductor, telecom, mobile, and technology outlets. Qualcomm also uses aliases such as `Qualcomm Incorporated`, `Qualcomm Technologies`, `Snapdragon`, and `Qualcomm AI`, so product or subsidiary coverage is less likely to be missed.
+
 Those branches flow through:
 
 ```text

@@ -48,7 +48,14 @@
     qualcomm: {
       name: "Qualcomm",
       domain: "qualcomm.com",
-      secCik: "804328"
+      secCik: "804328",
+      aliases: [
+        "Qualcomm Incorporated",
+        "Qualcomm Technologies",
+        "Snapdragon",
+        "Qualcomm AI",
+        "Qualcomm CDMA Technologies"
+      ]
     },
     nvidia: {
       name: "NVIDIA",
