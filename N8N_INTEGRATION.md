@@ -120,7 +120,7 @@ The latest webhook workflow no longer relies on one broad news query. `Normalize
 
 - `company_names`: the submitted company plus aliases such as `Mitsubishi Heavy Industries` and `MHI`
 - `official_domains`: company websites, press rooms, investor sites, wire services, and SEC where relevant
-- `news_domains`: curated media and wire-service domains
+- `news_domains`: curated media, wire-service, regional, and sector-specific domains
 - `announcement_query`: for company website announcements and press releases
 - `targeted_news_query`: for curated news-domain searches
 - `news_query`: for broad news search
@@ -128,10 +128,10 @@ The latest webhook workflow no longer relies on one broad news query. `Normalize
 The discovery branches are:
 
 - `Search Company Website Announcements`: searches official company domains and announcement sites.
-- `Search Curated News Sites`: searches a fixed set of major news/wire sources.
+- `Search Curated News Sites`: searches company-specific domain packs covering major news, wires, regional sources, and sector outlets.
 - `Search Broad News Sources`: searches broader Tavily news results without domain restriction.
 
-For semiconductor and technology companies such as Qualcomm, the workflow adds sector-specific sources to the curated news list, including semiconductor, telecom, mobile, and technology outlets. Qualcomm also uses aliases such as `Qualcomm Incorporated`, `Qualcomm Technologies`, `Snapdragon`, and `Qualcomm AI`, so product or subsidiary coverage is less likely to be missed.
+Every company in the dashboard has a profile in `Normalize Inputs` with aliases, official domains, curated sector sources, and sector-specific search terms. For example, energy companies use oil, LNG, upstream, and refining sources; banks use finance and banking sources; pharmaceutical companies use biotech and FDA-oriented sources; aerospace and defense companies use defense and aviation sources; and Japanese/Korean conglomerates include regional business outlets plus relevant sector sources. This is meant to catch company announcements, industry coverage, and broader news instead of relying on one generic company-name search.
 
 Those branches flow through:
 
