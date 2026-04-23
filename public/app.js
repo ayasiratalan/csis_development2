@@ -390,20 +390,34 @@
       headers[runtimeConfig.n8nAuthHeader] = runtimeConfig.n8nAuthValue;
     }
 
-    var response = await fetch(runtimeConfig.n8nWebhookUrl.trim(), {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify({
-        company_name: company.name,
-        company_domain: company.domain,
-        sec_cik: company.secCik,
-        company_aliases: company.aliases || [],
-        time_period_days: state.intervalDays,
-        time_period_label: state.intervalDays + " days"
-      })
-    });
+    var response;
+    try {
+      response = await fetch(runtimeConfig.n8nWebhookUrl.trim(), {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({
+          company_name: company.name,
+          company_domain: company.domain,
+          sec_cik: company.secCik,
+          company_aliases: company.aliases || [],
+          time_period_days: state.intervalDays,
+          time_period_label: state.intervalDays + " days"
+        })
+      });
+    } catch (error) {
+      throw new Error(
+        "Browser could not reach the n8n webhook. This is usually a CORS restriction, browser privacy/ad-blocking setting, VPN/firewall issue, or a stale config.js on this computer."
+      );
+    }
 
-    var payload = await response.json();
+    var payload;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      throw new Error(
+        "The webhook responded, but not with valid JSON. Check the live webhook URL and confirm n8n returns JSON from `Respond to Dashboard`."
+      );
+    }
     if (!response.ok) {
       throw new Error(
         payload.error ||
