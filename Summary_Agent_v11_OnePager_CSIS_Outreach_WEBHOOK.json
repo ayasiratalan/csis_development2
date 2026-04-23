@@ -313,7 +313,7 @@
       "parameters": {
         "operation": "xlsx",
         "options": {
-          "fileName": "={{ $(\"Normalize Inputs\").item.json.company_name }}_validated_documents_{{ $now.toFormat(\"yyyy-MM-dd\") }}.xlsx",
+          "fileName": "={{ $(\"Normalize Inputs\").first().json.company_name }}_validated_documents_{{ $now.toFormat(\"yyyy-MM-dd\") }}.xlsx",
           "sheetName": "Validated Documents"
         }
       },
@@ -689,16 +689,16 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "row_number": "={{ $('Normalize Inputs').item.json.row_number || '' }}",
-            "run_id": "={{ $('Normalize Inputs').item.json.run_id }}",
-            "company_name": "={{ $('Normalize Inputs').item.json.company_name }}",
-            "time_period_label": "={{ $('Normalize Inputs').item.json.time_period_label }}",
-            "time_period_days": "={{ $('Normalize Inputs').item.json.time_period_days }}",
+            "row_number": "={{ $('Normalize Inputs').first().json.row_number || '' }}",
+            "run_id": "={{ $('Normalize Inputs').first().json.run_id }}",
+            "company_name": "={{ $('Normalize Inputs').first().json.company_name }}",
+            "time_period_label": "={{ $('Normalize Inputs').first().json.time_period_label }}",
+            "time_period_days": "={{ $('Normalize Inputs').first().json.time_period_days }}",
             "status": "Completed",
-            "requested_at": "={{ $('Normalize Inputs').item.json.requested_at || '' }}",
-            "started_at": "={{ $('Normalize Inputs').item.json.scraped_at }}",
+            "requested_at": "={{ $('Normalize Inputs').first().json.requested_at || '' }}",
+            "started_at": "={{ $('Normalize Inputs').first().json.scraped_at }}",
             "finished_at": "={{ $now }}",
-            "notes": "={{ $('Normalize Inputs').item.json.notes || '' }}",
+            "notes": "={{ $('Normalize Inputs').first().json.notes || '' }}",
             "last_updated": "={{ $now }}",
             "objective_facts": "={{ $json.recent_developments_paragraph || \"\" }}",
             "strategic_decision": "={{ $json.email_pitch_ideas || \"\" }}",

@@ -405,9 +405,28 @@ updateNode("Validate Dates and Company Match", (node) => {
 
 updateNode("Append results to data_base_v1", (node) => {
   const value = node.parameters.columns.value;
-  value.row_number = "={{ $('Normalize Inputs').item.json.row_number || '' }}";
-  value.requested_at = "={{ $('Normalize Inputs').item.json.requested_at || '' }}";
-  value.notes = "={{ $('Normalize Inputs').item.json.notes || '' }}";
+  value.row_number = "={{ $('Normalize Inputs').first().json.row_number || '' }}";
+  value.run_id = "={{ $('Normalize Inputs').first().json.run_id }}";
+  value.company_name = "={{ $('Normalize Inputs').first().json.company_name }}";
+  value.time_period_label = "={{ $('Normalize Inputs').first().json.time_period_label }}";
+  value.time_period_days = "={{ $('Normalize Inputs').first().json.time_period_days }}";
+  value.requested_at = "={{ $('Normalize Inputs').first().json.requested_at || '' }}";
+  value.started_at = "={{ $('Normalize Inputs').first().json.scraped_at }}";
+  value.notes = "={{ $('Normalize Inputs').first().json.notes || '' }}";
+});
+
+updateNode("Convert Documents to Excel", (node) => {
+  if (!node.parameters.options) node.parameters.options = {};
+  if (typeof node.parameters.options.fileName === "string") {
+    node.parameters.options.fileName = node.parameters.options.fileName.replace(
+      /\$\("Normalize Inputs"\)\.item\.json/g,
+      "$(\"Normalize Inputs\").first().json"
+    );
+  } else {
+    node.parameters.options.fileName =
+      "={{ $(\"Normalize Inputs\").first().json.company_name }}_validated_documents_{{ $now.toFormat(\"yyyy-MM-dd\") }}.xlsx";
+  }
+  node.parameters.options.sheetName = "Validated Documents";
 });
 
 updateNode("Select Company Note", (node) => {
