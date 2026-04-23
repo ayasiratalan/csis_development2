@@ -136,76 +136,11 @@ function searchPurpose(queryField) {
 }
 
 function openAISearchBody(queryAccessor, domainsAccessor, maxResultsAccessor, queryField, defaultMaxResults) {
-  const schema = JSON.stringify({
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      search_summary: { type: "string" },
-      results: {
-        type: "array",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            title: { type: "string" },
-            url: { type: "string" },
-            source_domain: { type: "string" },
-            published_date: { type: "string" },
-            snippet: { type: "string" },
-            content_excerpt: { type: "string" }
-          },
-          required: [
-            "title",
-            "url",
-            "source_domain",
-            "published_date",
-            "snippet",
-            "content_excerpt"
-          ]
-        }
-      }
-    },
-    required: ["search_summary", "results"]
-  });
-
-  const startAccessor = queryAccessor.replace(queryField, "start_date");
-  const endAccessor = queryAccessor.replace(queryField, "end_date");
-  const companyAccessor = queryAccessor.replace(queryField, "company_name");
-  const daysAccessor = queryAccessor.replace(queryField, "time_period_days");
-  const domainsExpr = domainsAccessor || "[]";
-  const limitedDomains = `(Array.isArray(${domainsExpr}) ? ${domainsExpr}.filter(Boolean).slice(0, 100) : [])`;
-  const maxResultsExpr = `(Number(${maxResultsAccessor}) || ${defaultMaxResults})`;
-
-  return `={{ JSON.stringify({
-  model: 'gpt-5-mini',
-  reasoning: { effort: 'low' },
-  tools: ${limitedDomains}.length
-    ? [{ type: 'web_search', filters: { allowed_domains: ${limitedDomains} } }]
-    : [{ type: 'web_search' }],
-  tool_choice: 'required',
-  include: ['web_search_call.action.sources'],
-  text: {
-    format: {
-      type: 'json_schema',
-      name: 'company_search_results',
-      strict: true,
-      schema: ${schema}
-    }
-  },
-  input: [
-    'You are a deterministic corporate-source discovery engine.',
-    'Use OpenAI web search to collect recent and relevant ${searchPurpose(queryField)} for the target company.',
-    'Return only sources that are meaningfully about the company or directly relevant to its current policy, geopolitical, security, or sector environment.',
-    'Prefer distinct URLs. Avoid duplicates, directory pages, generic homepages, or irrelevant market summaries.',
-    'The date window is ' + ((${startAccessor} || '').toString()) + ' through ' + ((${endAccessor} || '').toString()) + ' (' + (Number(${daysAccessor} || 14)) + ' days).',
-    'Company: ' + ((${companyAccessor} || '').toString()),
-    'Search query: ' + ((${queryAccessor} || '').toString().trim()),
-    ${limitedDomains}.length ? 'Allowed domains: ' + ${limitedDomains}.join(', ') : 'Allowed domains: unrestricted',
-    'Return up to ' + ${maxResultsExpr} + ' results.',
-    'For each result, provide: title, url, source_domain, published_date if known (otherwise empty string), a short snippet, and a denser content_excerpt grounded in the source.',
-    'Do not invent URLs, dates, or excerpts. If little is available, return fewer results.'
-  ].join('\\n')
-}) }}`;
+  const bodyField = queryField.replace(/_query$/, "_request_body");
+  if (queryAccessor.startsWith("$json.")) {
+    return `={{ $json.${bodyField} }}`;
+  }
+  return `={{ $('Normalize Inputs').item.json.${bodyField} }}`;
 }
 
 function tavilyBody(queryField, options) {
@@ -368,6 +303,12 @@ function configureOpenAISearchNode(name) {
     node.parameters.sendBody = true;
     node.parameters.specifyBody = "json";
     node.parameters.options = node.parameters.options || {};
+  });
+}
+
+function setSearchNodeBody(name, expression) {
+  updateNode(name, (node) => {
+    node.parameters.jsonBody = expression;
   });
 }
 
@@ -585,7 +526,61 @@ updateNode("Normalize Inputs", (node) => {
 	      "const announcementQuery = buildLimitedQuery(queryCompanyNames, announcementQueryTerms);",
 	      "const targetedNewsQuery = buildLimitedQuery(queryCompanyNames, queryTerms);",
 	      "const newsQuery = buildLimitedQuery(queryCompanyNames, queryTerms);",
-	      "const newsDomains = dedup([...(profile.news_domains || globalNewsDomains)]);"
+	      "const newsDomains = dedup([...(profile.news_domains || globalNewsDomains)]);",
+	      "const openAISchema = {",
+	      "  type: 'object',",
+	      "  additionalProperties: false,",
+	      "  properties: {",
+	      "    search_summary: { type: 'string' },",
+	      "    results: {",
+	      "      type: 'array',",
+	      "      items: {",
+	      "        type: 'object',",
+	      "        additionalProperties: false,",
+	      "        properties: {",
+	      "          title: { type: 'string' },",
+	      "          url: { type: 'string' },",
+	      "          source_domain: { type: 'string' },",
+	      "          published_date: { type: 'string' },",
+	      "          snippet: { type: 'string' },",
+	      "          content_excerpt: { type: 'string' }",
+	      "        },",
+	      "        required: ['title', 'url', 'source_domain', 'published_date', 'snippet', 'content_excerpt']",
+	      "      }",
+	      "    }",
+	      "  },",
+	      "  required: ['search_summary', 'results']",
+	      "};",
+	      "const buildOpenAISearchRequest = (query, purpose, allowedDomains, maxResults) => ({",
+	      "  model: 'gpt-5-mini',",
+	      "  reasoning: { effort: 'low' },",
+	      "  tools: (allowedDomains || []).length",
+	      "    ? [{ type: 'web_search', filters: { allowed_domains: (allowedDomains || []).slice(0, 100) } }]",
+	      "    : [{ type: 'web_search' }],",
+	      "  tool_choice: 'required',",
+	      "  include: ['web_search_call.action.sources'],",
+	      "  text: {",
+	      "    format: {",
+	      "      type: 'json_schema',",
+	      "      name: 'company_search_results',",
+	      "      strict: true,",
+	      "      schema: openAISchema",
+	      "    }",
+	      "  },",
+	      "  input: [",
+	      "    'You are a deterministic corporate-source discovery engine.',",
+	      "    `Use OpenAI web search to collect recent and relevant ${purpose} for the target company.`,",
+	      "    'Return only sources that are meaningfully about the company or directly relevant to its current policy, geopolitical, security, or sector environment.',",
+	      "    'Prefer distinct URLs. Avoid duplicates, directory pages, generic homepages, or irrelevant market summaries.',",
+	      "    `The date window is ${start} through ${end} (${normalizedDays} days).`,",
+	      "    `Company: ${company}`,",
+	      "    `Search query: ${query}`,",
+	      "    (allowedDomains || []).length ? `Allowed domains: ${(allowedDomains || []).slice(0, 100).join(', ')}` : 'Allowed domains: unrestricted',",
+	      "    `Return up to ${maxResults} results.`,",
+	      "    'For each result, provide: title, url, source_domain, published_date if known (otherwise empty string), a short snippet, and a denser content_excerpt grounded in the source.',",
+	      "    'Do not invent URLs, dates, or excerpts. If little is available, return fewer results.'",
+	      "  ].join('\\n')",
+	      "});"
     ].join("\n")
   );
   node.parameters.functionCode = node.parameters.functionCode.replace(
@@ -598,7 +593,19 @@ updateNode("Normalize Inputs", (node) => {
   );
   node.parameters.functionCode = node.parameters.functionCode.replace(
     "    news_query: newsQuery,",
-    "    security_query: securityQuery,\n    announcement_query: announcementQuery,\n    targeted_news_query: targetedNewsQuery,\n    news_query: newsQuery,"
+    [
+      "    security_query: securityQuery,",
+      "    announcement_query: announcementQuery,",
+      "    targeted_news_query: targetedNewsQuery,",
+      "    news_query: newsQuery,",
+      "    official_request_body: buildOpenAISearchRequest(officialQuery, 'official company, investor-relations, filing, and regulatory sources', officialDomainsFinal, 10),",
+      "    government_request_body: buildOpenAISearchRequest(governmentQuery, 'government, procurement, lobbying, and federal-register sources', governmentDomains, 8),",
+      "    thinktank_request_body: buildOpenAISearchRequest(thinktankQuery, 'think tank, policy, and strategic-analysis sources', thinktankDomains, 8),",
+      "    security_request_body: buildOpenAISearchRequest(securityQuery, 'security, defense, alliance, force-posture, and geopolitical-risk sources', securityDomains, 10),",
+      "    announcement_request_body: buildOpenAISearchRequest(announcementQuery, 'official company announcements, newsroom posts, press releases, contracts, and awards', officialDomainsFinal, 20),",
+      "    targeted_news_request_body: buildOpenAISearchRequest(targetedNewsQuery, 'curated sector, financial, and specialist news sources', newsDomains, 30),",
+      "    news_request_body: buildOpenAISearchRequest(newsQuery, 'broad news coverage and major business press sources', [], 30),"
+    ].join("\n")
   );
 });
 
@@ -806,6 +813,60 @@ updateNode("Select Company Note", (node) => {
     "  ...corporateNewsLinks.map(hostname),",
     "  ...((normalized.official_domains || []).filter(Boolean))",
     "]);",
+    "const openAISchema = {",
+    "  type: 'object',",
+    "  additionalProperties: false,",
+    "  properties: {",
+    "    search_summary: { type: 'string' },",
+    "    results: {",
+    "      type: 'array',",
+    "      items: {",
+    "        type: 'object',",
+    "        additionalProperties: false,",
+    "        properties: {",
+    "          title: { type: 'string' },",
+    "          url: { type: 'string' },",
+    "          source_domain: { type: 'string' },",
+    "          published_date: { type: 'string' },",
+    "          snippet: { type: 'string' },",
+    "          content_excerpt: { type: 'string' }",
+    "        },",
+    "        required: ['title', 'url', 'source_domain', 'published_date', 'snippet', 'content_excerpt']",
+    "      }",
+    "    }",
+    "  },",
+    "  required: ['search_summary', 'results']",
+    "};",
+    "const buildOpenAISearchRequest = (query, purpose, allowedDomains, maxResults) => ({",
+    "  model: 'gpt-5-mini',",
+    "  reasoning: { effort: 'low' },",
+    "  tools: (allowedDomains || []).length",
+    "    ? [{ type: 'web_search', filters: { allowed_domains: (allowedDomains || []).slice(0, 100) } }]",
+    "    : [{ type: 'web_search' }],",
+    "  tool_choice: 'required',",
+    "  include: ['web_search_call.action.sources'],",
+    "  text: {",
+    "    format: {",
+    "      type: 'json_schema',",
+    "      name: 'company_search_results',",
+    "      strict: true,",
+    "      schema: openAISchema",
+    "    }",
+    "  },",
+    "  input: [",
+    "    'You are a deterministic corporate-source discovery engine.',",
+    "    `Use OpenAI web search to collect recent and relevant ${purpose} for the target company.`,",
+    "    'Return only sources that are meaningfully about the company or directly relevant to its current policy, geopolitical, security, or sector environment.',",
+    "    'Prefer distinct URLs. Avoid duplicates, directory pages, generic homepages, or irrelevant market summaries.',",
+    "    `The date window is ${normalized.start_date || ''} through ${normalized.end_date || ''} (${normalized.time_period_days || 14} days).`,",
+    "    `Company: ${normalized.company_name || ''}`,",
+    "    `Search query: ${query}` ,",
+    "    (allowedDomains || []).length ? `Allowed domains: ${(allowedDomains || []).slice(0, 100).join(', ')}` : 'Allowed domains: unrestricted',",
+    "    `Return up to ${maxResults} results.`,",
+    "    'For each result, provide: title, url, source_domain, published_date if known (otherwise empty string), a short snippet, and a denser content_excerpt grounded in the source.',",
+    "    'Do not invent URLs, dates, or excerpts. If little is available, return fewer results.'",
+    "  ].join('\\n')",
+    "});",
     "const note = {",
     "  company_name: match.company_name || match.Company || normalized.company_name || '',",
     "  industries: getField('industries', 'What industries are they in'),",
@@ -837,7 +898,8 @@ updateNode("Select Company Note", (node) => {
     "    corporate_news_links: corporateNewsLinks,",
     "    corporate_news_domains: corporateNewsDomains,",
     "    corporate_news_query: normalized.announcement_query,",
-    "    corporate_news_max_results: corporateNewsLinks.length ? 20 : 5",
+    "    corporate_news_max_results: corporateNewsLinks.length ? 20 : 5,",
+    "    corporate_news_request_body: buildOpenAISearchRequest(normalized.announcement_query, 'official corporate newsroom, announcement, and company-website sources', corporateNewsDomains, corporateNewsLinks.length ? 20 : 5)",
     "  },",
     "  pairedItem: { item: 0 }",
     "}];"
@@ -946,6 +1008,15 @@ copyNode("Search Broad News Sources", {
   "Search Corporate Newsroom Links",
   "Search Curated News Sites"
 ].forEach(configureOpenAISearchNode);
+
+setSearchNodeBody("Search Official / Regulatory Sources", "={{ $('Normalize Inputs').item.json.official_request_body }}");
+setSearchNodeBody("Search Government / Lobbying Sources", "={{ $('Normalize Inputs').item.json.government_request_body }}");
+setSearchNodeBody("Search Think Tank / Policy Sources", "={{ $('Normalize Inputs').item.json.thinktank_request_body }}");
+setSearchNodeBody("Search Security / Defense Sources", "={{ $('Normalize Inputs').item.json.security_request_body }}");
+setSearchNodeBody("Search Broad News Sources", "={{ $('Normalize Inputs').item.json.news_request_body }}");
+setSearchNodeBody("Search Company Website Announcements", "={{ $('Normalize Inputs').item.json.announcement_request_body }}");
+setSearchNodeBody("Search Corporate Newsroom Links", "={{ $json.corporate_news_request_body }}");
+setSearchNodeBody("Search Curated News Sites", "={{ $('Normalize Inputs').item.json.targeted_news_request_body }}");
 
 copyNode("Merge Broad News Meta + Results", {
   id: "merge-targeted-news-sites",
@@ -1163,6 +1234,23 @@ workflow.nodes
     node.parameters.sendBody = true;
     node.parameters.specifyBody = "json";
   });
+
+const exportBodyMap = {
+  "Search Official / Regulatory Sources": "={{ $('Normalize Inputs').item.json.official_request_body }}",
+  "Search Government / Lobbying Sources": "={{ $('Normalize Inputs').item.json.government_request_body }}",
+  "Search Think Tank / Policy Sources": "={{ $('Normalize Inputs').item.json.thinktank_request_body }}",
+  "Search Security / Defense Sources": "={{ $('Normalize Inputs').item.json.security_request_body }}",
+  "Search Broad News Sources": "={{ $('Normalize Inputs').item.json.news_request_body }}",
+  "Search Company Website Announcements": "={{ $('Normalize Inputs').item.json.announcement_request_body }}",
+  "Search Corporate Newsroom Links": "={{ $json.corporate_news_request_body }}",
+  "Search Curated News Sites": "={{ $('Normalize Inputs').item.json.targeted_news_request_body }}"
+};
+
+workflow.nodes.forEach((node) => {
+  if (exportBodyMap[node.name]) {
+    node.parameters.jsonBody = exportBodyMap[node.name];
+  }
+});
 
 fs.writeFileSync(outputPath, JSON.stringify(workflow, null, 2) + "\n");
 console.log("Wrote " + outputPath);
