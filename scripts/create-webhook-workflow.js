@@ -14,7 +14,7 @@ const outputPath = path.join(
 
 const workflow = JSON.parse(fs.readFileSync(inputPath, "utf8"));
 
-workflow.name = "Summary_Agent_v11_OnePager_CSIS_Outreach_WEBHOOK";
+workflow.name = "Summary_Agent_v11_OnePager_CSIS_Outreach_OPENAI_SEARCH_WEBHOOK";
 workflow.active = false;
 
 const removeNames = new Set([
@@ -28,7 +28,7 @@ workflow.nodes = workflow.nodes.filter((node) => !removeNames.has(node.name));
 workflow.nodes.unshift({
   parameters: {
     httpMethod: "POST",
-    path: "csis-company-memo",
+    path: "csis-company-memo-openai-search",
     responseMode: "responseNode",
     options: {
       responseHeaders: {
@@ -121,57 +121,260 @@ function copyNode(sourceName, overrides) {
   });
 }
 
+function searchPurpose(queryField) {
+  const purposes = {
+    official_query: "official company, investor-relations, filing, and regulatory sources",
+    government_query: "government, procurement, lobbying, and federal-register sources",
+    thinktank_query: "think tank, policy, and strategic-analysis sources",
+    security_query: "security, defense, alliance, force-posture, and geopolitical-risk sources",
+    announcement_query: "official company announcements, newsroom posts, press releases, contracts, and awards",
+    corporate_news_query: "official corporate newsroom, announcement, and company-website sources",
+    targeted_news_query: "curated sector, financial, and specialist news sources",
+    news_query: "broad news coverage and major business press sources"
+  };
+  return purposes[queryField] || "relevant web sources";
+}
+
+function openAISearchBody(queryAccessor, domainsAccessor, maxResultsAccessor, queryField, defaultMaxResults) {
+  const schema = JSON.stringify({
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      search_summary: { type: "string" },
+      results: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            title: { type: "string" },
+            url: { type: "string" },
+            source_domain: { type: "string" },
+            published_date: { type: "string" },
+            snippet: { type: "string" },
+            content_excerpt: { type: "string" }
+          },
+          required: [
+            "title",
+            "url",
+            "source_domain",
+            "published_date",
+            "snippet",
+            "content_excerpt"
+          ]
+        }
+      }
+    },
+    required: ["search_summary", "results"]
+  });
+
+  return `={{ (() => {
+  const query = (${queryAccessor} || '').toString().trim();
+  const startDate = (${queryAccessor.replace(queryField, "start_date")} || '').toString();
+  const endDate = (${queryAccessor.replace(queryField, "end_date")} || '').toString();
+  const company = (${queryAccessor.replace(queryField, "company_name")} || '').toString();
+  const days = Number(${queryAccessor.replace(queryField, "time_period_days")} || 14);
+  const domainsRaw = ${domainsAccessor || "[]"};
+  const domains = Array.isArray(domainsRaw) ? domainsRaw.filter(Boolean).slice(0, 100) : [];
+  const maxResults = Number(${maxResultsAccessor}) || ${defaultMaxResults};
+  const prompt = [
+    'You are a deterministic corporate-source discovery engine.',
+    'Use OpenAI web search to collect recent and relevant ${searchPurpose(queryField)} for the target company.',
+    'Return only sources that are meaningfully about the company or directly relevant to its current policy, geopolitical, security, or sector environment.',
+    'Prefer distinct URLs. Avoid duplicates, directory pages, generic homepages, or irrelevant market summaries.',
+    'The date window is ' + startDate + ' through ' + endDate + ' (' + days + ' days).',
+    'Company: ' + company,
+    'Search query: ' + query,
+    domains.length ? 'Allowed domains: ' + domains.join(', ') : 'Allowed domains: unrestricted',
+    'Return up to ' + maxResults + ' results.',
+    'For each result, provide: title, url, source_domain, published_date if known (otherwise empty string), a short snippet, and a denser content_excerpt grounded in the source.',
+    'Do not invent URLs, dates, or excerpts. If little is available, return fewer results.'
+  ].join('\\n');
+  const body = {
+    model: 'gpt-5-mini',
+    reasoning: { effort: 'low' },
+    tools: [
+      domains.length
+        ? { type: 'web_search', filters: { allowed_domains: domains } }
+        : { type: 'web_search' }
+    ],
+    tool_choice: 'required',
+    include: ['web_search_call.action.sources'],
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'company_search_results',
+        strict: true,
+        schema: ${schema}
+      }
+    },
+    input: prompt
+  };
+  return JSON.stringify(body);
+})() }}`;
+}
+
 function tavilyBody(queryField, options) {
-  const lines = [
-    `  query: $('Normalize Inputs').item.json.${queryField},`,
-    `  topic: '${options.topic}',`,
-    "  search_depth: 'advanced',"
-  ];
-  if (options.includeDomainsField) {
-    lines.push(`  include_domains: $('Normalize Inputs').item.json.${options.includeDomainsField},`);
-  }
-  lines.push(
-    "  include_raw_content: true,",
-    `  max_results: ${options.maxResults},`,
-    "  start_date: $('Normalize Inputs').item.json.start_date,",
-    "  end_date: $('Normalize Inputs').item.json.end_date,",
-    "  include_answer: false"
+  return openAISearchBody(
+    `$('Normalize Inputs').item.json.${queryField}`,
+    options.includeDomainsField
+      ? `$('Normalize Inputs').item.json.${options.includeDomainsField}`
+      : null,
+    options.maxResults,
+    queryField,
+    options.maxResults
   );
-  return `={{ JSON.stringify({\n${lines.join("\n")}\n}) }}`;
 }
 
 function tavilyBodyFromCurrentItem(queryField, domainsField, options) {
-  return `={{ JSON.stringify({
-  query: $json.${queryField},
-  topic: '${options.topic}',
-  search_depth: 'advanced',
-  include_domains: $json.${domainsField},
-  include_raw_content: true,
-  max_results: $json.${options.maxResultsField} || ${options.defaultMaxResults},
-  start_date: $json.start_date,
-  end_date: $json.end_date,
-  include_answer: false
-}) }}`;
+  return openAISearchBody(
+    `$json.${queryField}`,
+    domainsField ? `$json.${domainsField}` : null,
+    `$json.${options.maxResultsField} || ${options.defaultMaxResults}`,
+    queryField,
+    options.defaultMaxResults
+  );
 }
 
-function makeFlattenCodeFromNode(sourceNodeName, sourceClass, queryField) {
-  const source = workflow.nodes.find((node) => node.name === sourceNodeName);
-  if (!source) throw new Error("Missing news flatten source node");
-  const code = source.parameters.functionCode
-    .replace(/const sourceClass = '([^']+)';/, `const sourceClass = '${sourceClass}';`)
-    .replace(/const queryField = '([^']+)';/, `const queryField = '${queryField}';`);
-  if (code.includes("official_domains: item.official_domains")) return code;
-  return code
-    .split("company_domain: item.company_domain || '',")
-    .join("company_domain: item.company_domain || '',\n      official_domains: item.official_domains || [],\n      corporate_news_domains: item.corporate_news_domains || [],");
+function makeOpenAIFlattenCode(sourceClass, queryField) {
+  return `
+const sourceClass = '${sourceClass}';
+const queryField = '${queryField}';
+const item = items[0].json || {};
+const extractDomain = (url = '') => {
+  try { return new URL(url).hostname.replace(/^www\\./, ''); } catch (e) { return ''; }
+};
+const parseResponseText = () => {
+  if (typeof item.output_text === 'string' && item.output_text.trim()) return item.output_text.trim();
+  const output = Array.isArray(item.output) ? item.output : [];
+  const message = output.find((entry) => entry.type === 'message' && entry.role === 'assistant');
+  if (!message || !Array.isArray(message.content)) return '';
+  const textPart = message.content.find((entry) => entry.type === 'output_text' && typeof entry.text === 'string');
+  return textPart ? textPart.text.trim() : '';
+};
+const safeJsonParse = (text) => {
+  if (!text) return {};
+  try { return JSON.parse(text); } catch (error) { return {}; }
+};
+const gatherSources = () => {
+  const output = Array.isArray(item.output) ? item.output : [];
+  return output
+    .filter((entry) => entry.type === 'web_search_call' && entry.action && Array.isArray(entry.action.sources))
+    .flatMap((entry) => entry.action.sources || [])
+    .map((source) => ({
+      title: (source.title || '').toString(),
+      url: (source.url || source.link || '').toString()
+    }))
+    .filter((source) => source.url);
+};
+const parsed = safeJsonParse(parseResponseText());
+const rawResults = Array.isArray(parsed.results) ? parsed.results : [];
+const deduped = [];
+const seen = new Set();
+for (const doc of rawResults) {
+  const url = (doc.url || '').toString().trim();
+  if (!url || seen.has(url)) continue;
+  seen.add(url);
+  deduped.push(doc);
+}
+if (!deduped.length) {
+  for (const source of gatherSources()) {
+    if (seen.has(source.url)) continue;
+    seen.add(source.url);
+    deduped.push({
+      title: source.title || '',
+      url: source.url,
+      source_domain: extractDomain(source.url),
+      published_date: '',
+      snippet: '',
+      content_excerpt: ''
+    });
+  }
+}
+const docs = deduped.map((doc, idx) => {
+  const body = (doc.content_excerpt || doc.snippet || '').toString();
+  const url = (doc.url || '').toString().trim();
+  return {
+    json: {
+      run_id: item.run_id,
+      row_number: item.row_number,
+      company_name: item.company_name,
+      sec_cik: item.sec_cik || '',
+      company_domain: item.company_domain || '',
+      official_domains: item.official_domains || [],
+      corporate_news_domains: item.corporate_news_domains || [],
+      time_period_days: item.time_period_days,
+      time_period_label: item.time_period_label,
+      start_date: item.start_date,
+      end_date: item.end_date,
+      source_class: sourceClass,
+      source_domain: (doc.source_domain || extractDomain(url) || '').toString().slice(0, 255),
+      title: (doc.title || '').toString().slice(0, 500),
+      url,
+      published_date: (doc.published_date || '').toString().slice(0, 80),
+      scraped_at: item.scraped_at,
+      query_used: item[queryField],
+      snippet: (doc.snippet || '').toString().slice(0, 2000),
+      content_excerpt: body.slice(0, 10000),
+      content_length: body.length,
+      source_rank: idx + 1,
+      duplicate_flag: false,
+      placeholder: false
+    }
+  };
+});
+if (docs.length === 0) {
+  return [{
+    json: {
+      run_id: item.run_id,
+      row_number: item.row_number,
+      company_name: item.company_name,
+      sec_cik: item.sec_cik || '',
+      company_domain: item.company_domain || '',
+      official_domains: item.official_domains || [],
+      corporate_news_domains: item.corporate_news_domains || [],
+      time_period_days: item.time_period_days,
+      time_period_label: item.time_period_label,
+      start_date: item.start_date,
+      end_date: item.end_date,
+      source_class: sourceClass,
+      source_domain: '',
+      title: '',
+      url: '',
+      published_date: '',
+      scraped_at: item.scraped_at,
+      query_used: item[queryField],
+      snippet: '',
+      content_excerpt: '',
+      content_length: 0,
+      source_rank: 0,
+      duplicate_flag: false,
+      placeholder: true
+    }
+  }];
+}
+return docs;
+`;
+}
+
+function makeFlattenCodeFromNode(_sourceNodeName, sourceClass, queryField) {
+  return makeOpenAIFlattenCode(sourceClass, queryField);
 }
 
 function makeFlattenCode(sourceClass, queryField) {
-  const sourceName =
-    workflow.nodes.find((node) => node.name === "Flatten Broad News Results")
-      ? "Flatten Broad News Results"
-      : "Flatten News Results";
-  return makeFlattenCodeFromNode(sourceName, sourceClass, queryField);
+  return makeOpenAIFlattenCode(sourceClass, queryField);
+}
+
+function configureOpenAISearchNode(name) {
+  updateNode(name, (node) => {
+    node.parameters.method = "POST";
+    node.parameters.url = "https://api.openai.com/v1/responses";
+    node.parameters.authentication = "genericCredentialType";
+    node.parameters.genericAuthType = "httpHeaderAuth";
+    node.parameters.sendBody = true;
+    node.parameters.specifyBody = "json";
+    node.parameters.options = node.parameters.options || {};
+  });
 }
 
 updateNode("LLM 5 (Final Strategist)", (node) => {
@@ -199,6 +402,18 @@ updateNode("LLM 5 (Final Strategist)", (node) => {
       "\n- In `csis_convergence_paragraph`, explain not only economic or policy relevance but also what security, military, defense, regional-conflict, or deterrence questions CSIS could analyze for the company when relevant." +
       "\n- Use the structured `security_analysis` input to surface plausible conflict trajectories, force-posture implications, and defense-relevant questions for CSIS experts.";
   }
+});
+
+updateNode("Flatten Official Results", (node) => {
+  node.parameters.functionCode = makeOpenAIFlattenCode("official", "official_query");
+});
+
+updateNode("Flatten Government Results", (node) => {
+  node.parameters.functionCode = makeOpenAIFlattenCode("government", "government_query");
+});
+
+updateNode("Flatten Think Tank Results", (node) => {
+  node.parameters.functionCode = makeOpenAIFlattenCode("thinktank", "thinktank_query");
 });
 
 updateNode("Normalize Inputs", (node) => {
@@ -727,6 +942,17 @@ copyNode("Search Broad News Sources", {
   }
 });
 
+[
+  "Search Official / Regulatory Sources",
+  "Search Government / Lobbying Sources",
+  "Search Think Tank / Policy Sources",
+  "Search Security / Defense Sources",
+  "Search Broad News Sources",
+  "Search Company Website Announcements",
+  "Search Corporate Newsroom Links",
+  "Search Curated News Sites"
+].forEach(configureOpenAISearchNode);
+
 copyNode("Merge Broad News Meta + Results", {
   id: "merge-targeted-news-sites",
   name: "Merge Curated News Meta + Results",
@@ -928,6 +1154,21 @@ oldConnections["Prepare Webhook Response"] = {
 };
 
 workflow.connections = oldConnections;
+
+workflow.nodes
+  .filter(
+    (node) =>
+      node.type === "n8n-nodes-base.httpRequest" &&
+      /^Search /.test(node.name)
+  )
+  .forEach((node) => {
+    node.parameters.url = "https://api.openai.com/v1/responses";
+    node.parameters.authentication = "genericCredentialType";
+    node.parameters.genericAuthType = "httpHeaderAuth";
+    node.parameters.method = "POST";
+    node.parameters.sendBody = true;
+    node.parameters.specifyBody = "json";
+  });
 
 fs.writeFileSync(outputPath, JSON.stringify(workflow, null, 2) + "\n");
 console.log("Wrote " + outputPath);

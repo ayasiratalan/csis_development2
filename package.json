@@ -1,8 +1,8 @@
 {
-  "name": "csis-corporate-memo-dashboard",
+  "name": "csis-corporate-intelligence-openai-search",
   "version": "0.1.0",
   "private": true,
-  "description": "CSIS-styled dashboard for launching company memo workflows and displaying validated sources.",
+  "description": "CSIS dashboard and n8n workflow variant that uses OpenAI web search instead of Tavily.",
   "engines": {
     "node": ">=18"
   },

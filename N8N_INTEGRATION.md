@@ -6,7 +6,7 @@ The exported workflow in this folder:
 
 - reads pending rows from Google Sheets
 - normalizes `company_name` and `time_period_days`
-- searches via Tavily
+- searches via OpenAI Responses `web_search`
 - validates documents
 - saves validated documents to Google Drive as an Excel file
 - writes the final memo back into the spreadsheet
@@ -59,7 +59,7 @@ Until this is done, the dashboard can only run in mock/preview mode.
 
 1. Add a `Webhook` node at the start.
 2. Set the webhook method to `POST`.
-3. Set the webhook path to something stable, for example `csis-company-memo`.
+3. Set the webhook path to something stable, for example `csis-company-memo-openai-search`.
 4. Set the response mode to use a `Respond to Webhook` node.
 5. Map webhook JSON fields into the same shape used by `Normalize Inputs`.
 6. Connect the `Webhook` node directly into `Normalize Inputs`.
@@ -133,11 +133,22 @@ The discovery branches are:
 - `Search Corporate Newsroom Links`: reads the `Corporate News` column from `Company_Notes`, extracts newsroom URLs/domains, and searches those official newsroom sources directly.
 - `Search Security / Defense Sources`: searches security, defense, alliance, and military-analysis outlets relevant to the company and its sector.
 - `Search Curated News Sites`: searches company-specific domain packs covering major news, wires, regional sources, and sector outlets.
-- `Search Broad News Sources`: searches broader Tavily news results without domain restriction.
+- `Search Broad News Sources`: searches broader news results through OpenAI web search without domain restriction.
 
 Every company in the dashboard has a profile in `Normalize Inputs` with aliases, official domains, curated sector sources, and sector-specific search terms. For example, energy companies use oil, LNG, upstream, and refining sources; banks use finance and banking sources; pharmaceutical companies use biotech and FDA-oriented sources; aerospace and defense companies use defense and aviation sources; and Japanese/Korean conglomerates include regional business outlets plus relevant sector sources. This is meant to catch company announcements, industry coverage, and broader news instead of relying on one generic company-name search.
 
-The Tavily query field has a 400-character limit, so `Normalize Inputs` uses a `buildLimitedQuery` helper to cap each search query at 360 characters. Exhaustiveness comes from multiple search branches and curated domain packs, not from putting every alias and term into one oversized query.
+This OpenAI-search variant still uses `Normalize Inputs` to keep each company query concise, but the retrieval layer is OpenAI Responses `web_search` rather than Tavily. Exhaustiveness comes from multiple search branches and curated domain packs, not from one oversized query.
+
+## OpenAI credential for search nodes
+
+Each `Search ...` HTTP Request node in this variant posts to `https://api.openai.com/v1/responses`.
+
+Create an n8n `HTTP Header Auth` credential with:
+
+- Header name: `Authorization`
+- Header value: `Bearer YOUR_OPENAI_API_KEY`
+
+Then attach that credential to the search HTTP Request nodes after import.
 
 Those branches flow through:
 

@@ -1,6 +1,6 @@
-# CSIS Corporate Memo Dashboard
+# CSIS Corporate Intelligence Analysis - OpenAI Search Variant
 
-This workspace now includes a small web app that wraps the existing n8n workflow concept in a CSIS-styled dashboard.
+This repository is the OpenAI-search variant of the CSIS dashboard and workflow. It keeps the same UI and memo contract, but swaps Tavily out of the workflow and uses OpenAI Responses `web_search` for source discovery.
 
 ## What it does
 
@@ -70,7 +70,7 @@ If you want the HTML file itself to call n8n directly, edit [public/config.js](/
 
 ```js
 window.CSIS_DASHBOARD_CONFIG = {
-  n8nWebhookUrl: "https://your-n8n-domain.com/webhook/csis-company-memo",
+  n8nWebhookUrl: "https://your-n8n-domain.com/webhook/csis-company-memo-openai-search",
   n8nAuthHeader: "",
   n8nAuthValue: ""
 };
@@ -95,7 +95,7 @@ When pushed to GitHub, the workflow deploys the `public/` folder as a static Git
 Expected GitHub Pages URL:
 
 ```text
-https://ayasiratalan.github.io/csis_development/
+https://ayasiratalan.github.io/csis_development_openai_search/
 ```
 
 In the GitHub repository, set Pages source to `GitHub Actions` under:
@@ -116,7 +116,7 @@ Set your real n8n webhook URL:
 
 ```env
 WORKFLOW_MODE=webhook
-N8N_WEBHOOK_URL=https://your-n8n-domain.com/webhook/csis-company-memo
+N8N_WEBHOOK_URL=https://your-n8n-domain.com/webhook/csis-company-memo-openai-search
 ```
 
 Then run:
