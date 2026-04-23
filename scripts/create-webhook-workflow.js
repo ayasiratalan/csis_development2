@@ -168,50 +168,44 @@ function openAISearchBody(queryAccessor, domainsAccessor, maxResultsAccessor, qu
     required: ["search_summary", "results"]
   });
 
-  return `={{ (() => {
-  const query = (${queryAccessor} || '').toString().trim();
-  const startDate = (${queryAccessor.replace(queryField, "start_date")} || '').toString();
-  const endDate = (${queryAccessor.replace(queryField, "end_date")} || '').toString();
-  const company = (${queryAccessor.replace(queryField, "company_name")} || '').toString();
-  const days = Number(${queryAccessor.replace(queryField, "time_period_days")} || 14);
-  const domainsRaw = ${domainsAccessor || "[]"};
-  const domains = Array.isArray(domainsRaw) ? domainsRaw.filter(Boolean).slice(0, 100) : [];
-  const maxResults = Number(${maxResultsAccessor}) || ${defaultMaxResults};
-  const prompt = [
+  const startAccessor = queryAccessor.replace(queryField, "start_date");
+  const endAccessor = queryAccessor.replace(queryField, "end_date");
+  const companyAccessor = queryAccessor.replace(queryField, "company_name");
+  const daysAccessor = queryAccessor.replace(queryField, "time_period_days");
+  const domainsExpr = domainsAccessor || "[]";
+  const limitedDomains = `(Array.isArray(${domainsExpr}) ? ${domainsExpr}.filter(Boolean).slice(0, 100) : [])`;
+  const maxResultsExpr = `(Number(${maxResultsAccessor}) || ${defaultMaxResults})`;
+
+  return `={{ JSON.stringify({
+  model: 'gpt-5-mini',
+  reasoning: { effort: 'low' },
+  tools: ${limitedDomains}.length
+    ? [{ type: 'web_search', filters: { allowed_domains: ${limitedDomains} } }]
+    : [{ type: 'web_search' }],
+  tool_choice: 'required',
+  include: ['web_search_call.action.sources'],
+  text: {
+    format: {
+      type: 'json_schema',
+      name: 'company_search_results',
+      strict: true,
+      schema: ${schema}
+    }
+  },
+  input: [
     'You are a deterministic corporate-source discovery engine.',
     'Use OpenAI web search to collect recent and relevant ${searchPurpose(queryField)} for the target company.',
     'Return only sources that are meaningfully about the company or directly relevant to its current policy, geopolitical, security, or sector environment.',
     'Prefer distinct URLs. Avoid duplicates, directory pages, generic homepages, or irrelevant market summaries.',
-    'The date window is ' + startDate + ' through ' + endDate + ' (' + days + ' days).',
-    'Company: ' + company,
-    'Search query: ' + query,
-    domains.length ? 'Allowed domains: ' + domains.join(', ') : 'Allowed domains: unrestricted',
-    'Return up to ' + maxResults + ' results.',
+    'The date window is ' + ((${startAccessor} || '').toString()) + ' through ' + ((${endAccessor} || '').toString()) + ' (' + (Number(${daysAccessor} || 14)) + ' days).',
+    'Company: ' + ((${companyAccessor} || '').toString()),
+    'Search query: ' + ((${queryAccessor} || '').toString().trim()),
+    ${limitedDomains}.length ? 'Allowed domains: ' + ${limitedDomains}.join(', ') : 'Allowed domains: unrestricted',
+    'Return up to ' + ${maxResultsExpr} + ' results.',
     'For each result, provide: title, url, source_domain, published_date if known (otherwise empty string), a short snippet, and a denser content_excerpt grounded in the source.',
     'Do not invent URLs, dates, or excerpts. If little is available, return fewer results.'
-  ].join('\\n');
-  const body = {
-    model: 'gpt-5-mini',
-    reasoning: { effort: 'low' },
-    tools: [
-      domains.length
-        ? { type: 'web_search', filters: { allowed_domains: domains } }
-        : { type: 'web_search' }
-    ],
-    tool_choice: 'required',
-    include: ['web_search_call.action.sources'],
-    text: {
-      format: {
-        type: 'json_schema',
-        name: 'company_search_results',
-        strict: true,
-        schema: ${schema}
-      }
-    },
-    input: prompt
-  };
-  return JSON.stringify(body);
-})() }}`;
+  ].join('\\n')
+}) }}`;
 }
 
 function tavilyBody(queryField, options) {
