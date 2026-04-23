@@ -180,6 +180,75 @@ html {
   gap: 10px;
 }
 
+.range-block {
+  padding: 16px 16px 14px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.range-header,
+.progress-topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.range-current-label {
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.range-value {
+  font-family: "Avenir Next Condensed", "Franklin Gothic Medium", sans-serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+
+#day-slider {
+  width: 100%;
+  margin-top: 18px;
+  appearance: none;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(215, 181, 109, 0.55), rgba(255, 255, 255, 0.15));
+  outline: none;
+}
+
+#day-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 6px rgba(215, 181, 109, 0.18);
+  cursor: pointer;
+}
+
+#day-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 6px rgba(215, 181, 109, 0.18);
+  cursor: pointer;
+}
+
+.range-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+  color: var(--text-soft);
+  font-size: 0.86rem;
+}
+
 .company-scroll {
   max-height: 290px;
   overflow: auto;
@@ -248,7 +317,8 @@ html {
 .loading-panel {
   display: flex;
   gap: 22px;
-  align-items: center;
+  align-items: stretch;
+  justify-content: space-between;
   min-height: 220px;
   padding: 28px;
   border: 1px solid var(--line);
@@ -260,6 +330,13 @@ html {
 
 .loading-panel[hidden] {
   display: none !important;
+}
+
+.loading-copy {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+  flex: 1 1 60%;
 }
 
 .loading-panel h2 {
@@ -283,6 +360,59 @@ html {
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 900ms linear infinite;
+}
+
+.progress-card {
+  flex: 0 0 min(320px, 38%);
+  padding: 18px 18px 16px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.progress-topline {
+  color: var(--text-main);
+  font-size: 0.96rem;
+  line-height: 1.4;
+}
+
+#progress-stage {
+  max-width: 70%;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+}
+
+#progress-percent {
+  color: var(--accent);
+  font-family: "Avenir Next Condensed", "Franklin Gothic Medium", sans-serif;
+  font-size: 1.35rem;
+  letter-spacing: 0.04em;
+}
+
+.progress-track {
+  margin-top: 14px;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.progress-fill {
+  width: 8%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #d7b56d, #7eb7d2);
+  box-shadow: 0 0 18px rgba(126, 183, 210, 0.28);
+  transition: width 320ms ease;
+}
+
+.progress-note {
+  margin: 12px 0 0;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  line-height: 1.5;
 }
 
 @keyframes spin {
@@ -447,6 +577,17 @@ html {
     position: static;
   }
 
+  .loading-panel,
+  .loading-copy {
+    flex-direction: column;
+    align-items: start;
+  }
+
+  .progress-card {
+    width: 100%;
+    flex-basis: auto;
+  }
+
   .results-header,
   .sources-header,
   .source-topline {
@@ -476,5 +617,10 @@ html {
   .hero-copy,
   .memo-body {
     font-size: 1rem;
+  }
+
+  .range-header,
+  .progress-topline {
+    gap: 10px;
   }
 }

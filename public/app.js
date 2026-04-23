@@ -146,10 +146,14 @@
   };
 
   var companyOptions = document.getElementById("company-options");
-  var intervalOptions = document.getElementById("interval-options");
+  var daySlider = document.getElementById("day-slider");
+  var dayValue = document.getElementById("day-value");
   var generateButton = document.getElementById("generate-button");
   var statusBox = document.getElementById("status-box");
   var loadingPanel = document.getElementById("loading-panel");
+  var progressFill = document.getElementById("progress-fill");
+  var progressPercent = document.getElementById("progress-percent");
+  var progressStage = document.getElementById("progress-stage");
   var resultsPanel = document.getElementById("results-panel");
   var modeChip = document.getElementById("mode-chip");
   var memoTitle = document.getElementById("memo-title");
@@ -157,9 +161,87 @@
   var runMeta = document.getElementById("run-meta");
   var sourcesList = document.getElementById("sources-list");
   var fileChip = document.getElementById("file-chip");
+  var progressTimer = null;
+
+  function sliderPercent() {
+    var min = Number(daySlider.min || 14);
+    var max = Number(daySlider.max || 60);
+    return ((state.intervalDays - min) / (max - min)) * 100;
+  }
+
+  function renderDaySelector() {
+    if (!daySlider || !dayValue) return;
+    daySlider.value = String(state.intervalDays);
+    dayValue.textContent = state.intervalDays + " days";
+    daySlider.style.background =
+      "linear-gradient(90deg, rgba(215, 181, 109, 0.88) 0%, rgba(215, 181, 109, 0.88) " +
+      sliderPercent() +
+      "%, rgba(255, 255, 255, 0.15) " +
+      sliderPercent() +
+      "%, rgba(255, 255, 255, 0.15) 100%)";
+  }
 
   function setStatus(message) {
     statusBox.textContent = message;
+  }
+
+  function progressStageLabel(percent) {
+    if (percent < 18) return "Submitting request";
+    if (percent < 44) return "Collecting source universe";
+    if (percent < 68) return "Validating documents";
+    if (percent < 88) return "Drafting memo";
+    return "Finalizing memo and sources";
+  }
+
+  function setProgress(percent) {
+    var bounded = Math.max(8, Math.min(100, Math.round(percent)));
+    progressFill.style.width = bounded + "%";
+    progressPercent.textContent = bounded + "%";
+    progressStage.textContent = progressStageLabel(bounded);
+  }
+
+  function stopProgressSimulation() {
+    if (progressTimer) {
+      window.clearInterval(progressTimer);
+      progressTimer = null;
+    }
+  }
+
+  function startProgressSimulation() {
+    var checkpoints = [
+      { elapsed: 0, percent: 8 },
+      { elapsed: 3500, percent: 18 },
+      { elapsed: 15000, percent: 40 },
+      { elapsed: 32000, percent: 64 },
+      { elapsed: 54000, percent: 82 },
+      { elapsed: 85000, percent: 93 }
+    ];
+    var startedAt = Date.now();
+
+    stopProgressSimulation();
+    setProgress(8);
+
+    progressTimer = window.setInterval(function () {
+      var elapsed = Date.now() - startedAt;
+      var current = checkpoints[0];
+      var next = checkpoints[checkpoints.length - 1];
+
+      checkpoints.forEach(function (point, index) {
+        if (elapsed >= point.elapsed) {
+          current = point;
+          next = checkpoints[Math.min(index + 1, checkpoints.length - 1)];
+        }
+      });
+
+      if (current === next) {
+        setProgress(current.percent);
+        return;
+      }
+
+      var span = next.elapsed - current.elapsed;
+      var ratio = span > 0 ? (elapsed - current.elapsed) / span : 1;
+      setProgress(current.percent + (next.percent - current.percent) * ratio);
+    }, 420);
   }
 
   function setLoading(isLoading) {
@@ -169,7 +251,11 @@
     loadingPanel.hidden = !isLoading;
     if (isLoading) {
       resultsPanel.hidden = true;
+      startProgressSimulation();
+      return;
     }
+    stopProgressSimulation();
+    setProgress(8);
   }
 
   function setActiveButton(container, attributeName, value) {
@@ -508,6 +594,30 @@
       });
   }
 
+  function normalizePastEngagementParagraph(text) {
+    var normalized = String(text || "").trim();
+    if (!normalized) return "";
+
+    normalized = normalized
+      .replace(/^According to (the )?company note[:,]?\s*/i, "")
+      .replace(/^Based on (the )?company note[:,]?\s*/i, "")
+      .replace(/^Company note[:,]?\s*/i, "")
+      .replace(/^In the past[:,]?\s*/i, "");
+
+    if (!normalized) {
+      return "In the past, no prior CSIS engagement details were available in the company note.";
+    }
+
+    return "In the past, " + normalized;
+  }
+
+  function normalizeMemoParagraph(title, text) {
+    if (String(title || "").toLowerCase().indexOf("past csis engagement") !== -1) {
+      return normalizePastEngagementParagraph(text);
+    }
+    return text;
+  }
+
   function sectionSources(title, sources) {
     var lowerTitle = title.toLowerCase();
     var filtered = sources || [];
@@ -576,7 +686,7 @@
         .split(/\n{2,}/)
         .filter(Boolean)
         .forEach(function (paragraph, paragraphIndex) {
-          var trimmed = paragraph.trim();
+          var trimmed = normalizeMemoParagraph(section.title, paragraph.trim());
 
           if (trimmed.indexOf("- ") === 0) {
             var list = document.createElement("ul");
@@ -748,18 +858,18 @@
     setActiveButton(companyOptions, "data-company", state.companyKey);
   });
 
-  intervalOptions.addEventListener("click", function (event) {
-    var button = event.target.closest("[data-interval]");
-    if (!button || state.loading) return;
-    state.intervalDays = Number(button.getAttribute("data-interval"));
-    setActiveButton(intervalOptions, "data-interval", state.intervalDays);
+  daySlider.addEventListener("input", function (event) {
+    if (state.loading) return;
+    state.intervalDays = Number(event.target.value);
+    renderDaySelector();
   });
 
   generateButton.addEventListener("click", async function () {
+    var company = companyData[state.companyKey];
     setLoading(true);
     setStatus(
       "Submitting " +
-        state.companyKey +
+        company.name +
         " for a " +
         state.intervalDays +
         "-day run. Waiting for the workflow to return the memo and validated sources."
@@ -783,6 +893,7 @@
   });
 
   renderCompanyOptions();
+  renderDaySelector();
 
   loadHealth().then(function () {
     var search = new URLSearchParams(window.location.search);

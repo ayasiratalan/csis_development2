@@ -35,11 +35,31 @@
           </div>
 
           <div class="selector-block">
-            <span class="selector-label">Time Interval</span>
-            <div class="pill-row" id="interval-options">
-              <button class="pill active" data-interval="14">14 days</button>
-              <button class="pill" data-interval="30">30 days</button>
-              <button class="pill" data-interval="60">60 days</button>
+            <span class="selector-label">Number of Days</span>
+            <div class="range-block">
+              <div class="range-header">
+                <span class="range-current-label">Selected Window</span>
+                <strong class="range-value" id="day-value">14 days</strong>
+              </div>
+              <input
+                type="range"
+                id="day-slider"
+                min="14"
+                max="60"
+                step="1"
+                value="14"
+                list="day-marks"
+              />
+              <datalist id="day-marks">
+                <option value="14" label="14"></option>
+                <option value="30" label="30"></option>
+                <option value="60" label="60"></option>
+              </datalist>
+              <div class="range-scale" aria-hidden="true">
+                <span>14</span>
+                <span>30</span>
+                <span>60</span>
+              </div>
             </div>
           </div>
 
@@ -53,13 +73,27 @@
         </section>
 
         <section class="loading-panel" id="loading-panel" hidden>
-          <div class="loader-ring"></div>
-          <div>
-            <div class="eyebrow">Workflow Running</div>
-            <h2>Building the memo</h2>
-            <p>
-              Collecting sources, validating documents, writing the memo,
-              and preparing the final source list.
+          <div class="loading-copy">
+            <div class="loader-ring"></div>
+            <div>
+              <div class="eyebrow">Workflow Running</div>
+              <h2>Building the memo</h2>
+              <p>
+                n8n is collecting sources, validating documents, writing the memo,
+                and preparing the final source list.
+              </p>
+            </div>
+          </div>
+          <div class="progress-card">
+            <div class="progress-topline">
+              <span id="progress-stage">Submitting request</span>
+              <strong id="progress-percent">8%</strong>
+            </div>
+            <div class="progress-track" aria-hidden="true">
+              <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <p class="progress-note">
+              Progress is estimated from the workflow stages until the final response returns.
             </p>
           </div>
         </section>

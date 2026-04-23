@@ -188,6 +188,11 @@ updateNode("LLM 5 (Final Strategist)", (node) => {
       "\n- If a sentence is based only on the company note and not on validated external sources, do not invent a citation for it." +
       "\n- Do not invent facts, meetings, experts, reports, or citation URLs.";
   }
+  if (!systemMessage.content.includes("Start `past_csis_engagement_paragraph` with the exact words")) {
+    systemMessage.content +=
+      "\n- Start `past_csis_engagement_paragraph` with the exact words `In the past,`." +
+      "\n- Do not begin `past_csis_engagement_paragraph` with phrases such as `According to company note`, `According to the company note`, or similar formulations.";
+  }
   if (!systemMessage.content.includes("military or defense perspective")) {
     systemMessage.content +=
       "\n- When the company is exposed to war, alliance politics, deterrence dynamics, force posture, defense-industrial-base issues, export controls, cyber conflict, maritime disruption, or regional escalation, include that military or defense perspective explicitly rather than reducing the analysis to economics or trade." +
