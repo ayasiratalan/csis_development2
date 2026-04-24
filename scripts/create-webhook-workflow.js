@@ -56,6 +56,37 @@ workflow.nodes.unshift({
   name: "Dashboard Webhook"
 });
 
+workflow.nodes.unshift({
+  parameters: {},
+  type: "n8n-nodes-base.manualTrigger",
+  typeVersion: 1,
+  position: [-720, 560],
+  id: "manual-test-trigger",
+  name: "Manual Test Trigger"
+});
+
+workflow.nodes.unshift({
+  parameters: {
+    jsCode: [
+      "return [{",
+      "  json: {",
+      "    company_name: 'Aramco',",
+      "    company_domain: 'aramco.com',",
+      "    company_aliases: ['Saudi Aramco', 'Saudi Arabian Oil Company'],",
+      "    time_period_days: 14,",
+      "    time_period_label: '14 days',",
+      "    notes: 'Manual n8n test input. Edit this node to test another company or interval.'",
+      "  }",
+      "}];"
+    ].join("\n")
+  },
+  type: "n8n-nodes-base.code",
+  typeVersion: 2,
+  position: [-512, 560],
+  id: "manual-test-payload",
+  name: "Manual Test Payload"
+});
+
 workflow.nodes.push({
   parameters: {
     jsCode: [
@@ -1079,6 +1110,14 @@ delete oldConnections["Merge News Meta + Results"];
 delete oldConnections["Flatten News Results"];
 
 oldConnections["Dashboard Webhook"] = {
+  main: [[{ node: "Normalize Inputs", type: "main", index: 0 }]]
+};
+
+oldConnections["Manual Test Trigger"] = {
+  main: [[{ node: "Manual Test Payload", type: "main", index: 0 }]]
+};
+
+oldConnections["Manual Test Payload"] = {
   main: [[{ node: "Normalize Inputs", type: "main", index: 0 }]]
 };
 
